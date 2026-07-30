@@ -62,8 +62,10 @@ def brand_fg(text, rgb, *extra):
 
 
 def brand_flow(text, elapsed):
-    """品牌蓝水波:以 swarm 为波心,亮度波向左右两侧同时扩散(涟漪)。
-    波长 ~18 字符,每秒传播 ~4 字符,1fps 下是连续流动而非跳动。"""
+    """品牌蓝水波:以 swarm 为波心向两侧扩散,双波干涉出水花。
+    受限于 TUI 状态栏 1 次/秒的运行上限(status-line-command.ts:
+    STATUS_LINE_RERUN_INTERVAL_MS=1000,Claude Code 同款契约),
+    已调到该帧率下的最大流畅度:主波每秒 ~9 字符 + 反向次波干涉。"""
     import math
     center = text.find('swarm')
     center = center + 2 if center >= 0 else len(text) // 2
@@ -72,8 +74,12 @@ def brand_flow(text, elapsed):
         if ch == ' ':
             out.append(' ')
             continue
-        v = (math.sin(abs(i - center) * 0.35 - elapsed * 1.4) + 1) / 2
-        v **= 1.4
+        d = abs(i - center)
+        w1 = math.sin(d * 0.30 - elapsed * 2.6)        # 主波:双向快推
+        w2 = math.sin(d * 0.13 + elapsed * 1.9)        # 次波:反向慢回,干涉
+        v = (w1 + 0.6 * w2) / 1.6
+        v = (v + 1) / 2
+        v = 0.25 + 0.75 * (v ** 1.3)                    # 暗部保底亮度,全程可读
         r = int(BRAND_DIM[0] + (225 - BRAND_DIM[0]) * v)
         g = int(BRAND_DIM[1] + (238 - BRAND_DIM[1]) * v)
         b = int(BRAND_DIM[2] + (255 - BRAND_DIM[2]) * v)
