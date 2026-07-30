@@ -61,20 +61,22 @@ def brand_fg(text, rgb, *extra):
     return f'\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m' + ''.join(extra) + str(text) + RESET
 
 
-def brand_burst(text, elapsed):
-    """品牌蓝扫描带:亮带在 BURST_S 内扫约 1.5 趟,峰值向白提亮。"""
-    n = max(1, len(text))
-    pos = (elapsed / BURST_S) * 1.5 * (n + 16) - 8
+def brand_flow(text, elapsed):
+    """品牌蓝水波:以 swarm 为波心,亮度波向左右两侧同时扩散(涟漪)。
+    波长 ~18 字符,每秒传播 ~4 字符,1fps 下是连续流动而非跳动。"""
+    import math
+    center = text.find('swarm')
+    center = center + 2 if center >= 0 else len(text) // 2
     out = []
     for i, ch in enumerate(text):
         if ch == ' ':
             out.append(' ')
             continue
-        t = max(0.0, 1.0 - abs(i - pos) / 7.0)
-        t *= t
-        r = int(BRAND_DIM[0] + (235 - BRAND_DIM[0]) * t)
-        g = int(BRAND_DIM[1] + (242 - BRAND_DIM[1]) * t)
-        b = int(BRAND_DIM[2] + (255 - BRAND_DIM[2]) * t)
+        v = (math.sin(abs(i - center) * 0.35 - elapsed * 1.4) + 1) / 2
+        v **= 1.4
+        r = int(BRAND_DIM[0] + (225 - BRAND_DIM[0]) * v)
+        g = int(BRAND_DIM[1] + (238 - BRAND_DIM[1]) * v)
+        b = int(BRAND_DIM[2] + (255 - BRAND_DIM[2]) * v)
         out.append(f'\033[38;2;{r};{g};{b}m{ch}')
     out.append(RESET)
     return ''.join(out)
@@ -385,8 +387,8 @@ def main():
     out = sep().join(line1) if line1 else 'kimi-code'
     elapsed = time.time() - enter_ts if (swarm and enter_ts) else 1e9
     if swarm and USE_ANSI and elapsed < BURST_S:
-        # 进入 swarm 的前几秒:品牌蓝亮带快速扫过整行,随后收敛为普通分段色
-        print(brand_burst(ANSI_RE.sub('', out), elapsed))
+        # 进入 swarm 的前几秒:品牌蓝水波自 swarm 处向两侧荡开,随后收敛为普通分段色
+        print(brand_flow(ANSI_RE.sub('', out), elapsed))
     else:
         print(out)
 
