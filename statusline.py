@@ -48,16 +48,36 @@ USE_ANSI = os.environ.get('KIMI_SL_NOCOLOR') != '1'
 RESET, BOLD, DIM = '\033[0m', '\033[1m', '\033[2m'
 REVERSE = '\033[7m'
 
-# swarm 动效:逐秒换帧(脚本无状态,帧号 = 当前秒数)
-RAINBOW = [201, 165, 129, 93, 63, 39, 45, 51]  # 品红→紫→蓝→青 256 色循环
-SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+# swarm 动效:进入 swarm 的前几秒品牌蓝扫描带,随后收敛为静态标记
+BRAND = (0x4F, 0xA8, 0xFF)      # Kimi Code 官方主题 primary #4FA8FF
+BRAND_DIM = (0x24, 0x4E, 0x80)
+BURST_S = 8.0                   # 扫描特效持续秒数
 ANSI_RE = __import__('re').compile(r'\033\[[0-9;]*m')
 
 
-def c256(text, n, *extra):
+def brand_fg(text, rgb, *extra):
     if not USE_ANSI:
         return text
-    return f'\033[38;5;{n}m' + ''.join(extra) + str(text) + RESET
+    return f'\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m' + ''.join(extra) + str(text) + RESET
+
+
+def brand_burst(text, elapsed):
+    """品牌蓝扫描带:亮带在 BURST_S 内扫约 1.5 趟,峰值向白提亮。"""
+    n = max(1, len(text))
+    pos = (elapsed / BURST_S) * 1.5 * (n + 16) - 8
+    out = []
+    for i, ch in enumerate(text):
+        if ch == ' ':
+            out.append(' ')
+            continue
+        t = max(0.0, 1.0 - abs(i - pos) / 7.0)
+        t *= t
+        r = int(BRAND_DIM[0] + (235 - BRAND_DIM[0]) * t)
+        g = int(BRAND_DIM[1] + (242 - BRAND_DIM[1]) * t)
+        b = int(BRAND_DIM[2] + (255 - BRAND_DIM[2]) * t)
+        out.append(f'\033[38;2;{r};{g};{b}m{ch}')
+    out.append(RESET)
+    return ''.join(out)
 CYAN, GREEN, YELLOW, RED, MAGENTA, BLUE, GRAY = (
     '\033[36m', '\033[32m', '\033[33m', '\033[31m', '\033[35m', '\033[34m', '\033[90m')
 
@@ -231,30 +251,14 @@ def reset_hint(iso):
         return ''
 
 
-def rainbow_line(text, frame):
-    """整行彩虹渐变波:每个字符一个色相,随秒数流动(24-bit 真彩色)。"""
-    import colorsys
-    out, i = [], 0
-    for ch in text:
-        if ch == ' ':
-            out.append(' ')
-            continue
-        hue = (i * 3.0 + frame * 25.0) % 360
-        r, g, b = colorsys.hls_to_rgb(hue / 360.0, 0.62, 1.0)
-        out.append(f'\033[38;2;{int(r * 255)};{int(g * 255)};{int(b * 255)}m\033[1m{ch}')
-        i += 1
-    out.append(RESET)
-    return ''.join(out)
-
-
 def session_state(session_id):
-    """从当前会话 wire.jsonl 尾部重建 (思考强度, swarm是否激活)。"""
-    effort, swarm = '', False
+    """从当前会话 wire.jsonl 尾部重建 (思考强度, swarm是否激活, 最近一次进入时间)。"""
+    effort, swarm, enter_ts = '', False, 0.0
     if not session_id:
-        return effort, swarm
+        return effort, swarm, enter_ts
     hits = glob.glob(os.path.join(SESSIONS, '*', session_id, 'agents', 'main', 'wire.jsonl'))
     if not hits:
-        return effort, swarm
+        return effort, swarm, enter_ts
     try:
         with open(hits[0], 'rb') as f:
             f.seek(0, os.SEEK_END)
@@ -262,7 +266,7 @@ def session_state(session_id):
             f.seek(max(0, size - TAIL_BYTES))
             tail = f.read().splitlines()
     except OSError:
-        return effort, swarm
+        return effort, swarm, enter_ts
     for line in tail:
         if b'thinkingEffort' in line:
             try:
@@ -282,9 +286,10 @@ def session_state(session_id):
             t = r.get('type', '')
             if t == 'swarm_mode.enter':
                 swarm = True
+                enter_ts = r.get('time', 0) / 1000
             elif t == 'swarm_mode.exit':
                 swarm = False
-    return effort, swarm
+    return effort, swarm, enter_ts
 
 
 def pick(d, *keys, default=''):
@@ -322,7 +327,7 @@ def main():
     model = pick(snap, 'model', 'model_alias', 'modelAlias')
     if isinstance(model, dict):
         model = pick(model, 'alias', 'id', 'name')
-    effort, swarm = session_state(pick(snap, 'sessionId', 'session_id'))
+    effort, swarm, enter_ts = session_state(pick(snap, 'sessionId', 'session_id'))
     if model:
         seg = c(str(model).split('/')[-1], CYAN, BOLD) + (c('·' + effort, DIM) if effort else '')
         max_ctx = pick(snap, 'maxContextTokens', 'max_context_tokens', default=0) or 0
@@ -330,11 +335,9 @@ def main():
             seg += ' ' + c(f'[{fmt_ctx(max_ctx)}]', DIM)
         line1.append(seg)
 
-    # swarm 动效:旋转体 + 反色高亮(激活才显示),整行彩虹循环色边框
-    frame = int(time.time())
+    # swarm 静态标记(品牌蓝);进入瞬间的扫描动效在输出阶段处理
     if swarm:
-        spin = SPINNER[frame % len(SPINNER)]
-        line1.append(c256(f'{spin} swarm ', RAINBOW[frame % len(RAINBOW)], BOLD, REVERSE))
+        line1.append(brand_fg('swarm', BRAND, BOLD))
 
     # 上下文条:原生 UI(line 2)已有,这里不重复
 
@@ -380,10 +383,10 @@ def main():
         line1.append(c(os.path.basename(str(cwd).rstrip('/')), BLUE))
 
     out = sep().join(line1) if line1 else 'kimi-code'
-    if swarm and USE_ANSI:
-        # ultracode 级特效:整行彩虹渐变波,逐秒流动(剥掉分段色,全行上色)
-        plain = ANSI_RE.sub('', out)
-        print(rainbow_line(plain, frame))
+    elapsed = time.time() - enter_ts if (swarm and enter_ts) else 1e9
+    if swarm and USE_ANSI and elapsed < BURST_S:
+        # 进入 swarm 的前几秒:品牌蓝亮带快速扫过整行,随后收敛为普通分段色
+        print(brand_burst(ANSI_RE.sub('', out), elapsed))
     else:
         print(out)
 
