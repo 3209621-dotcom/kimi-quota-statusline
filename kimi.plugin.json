@@ -1,6 +1,6 @@
 {
   "name": "kimi-quota-statusline",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Kimi Code 底部状态栏增强:权限模式 / 模型·思考强度 / swarm 特效 / 5h·7d 官方额度条 / 今日 token 与金额 / git·目录",
   "keywords": ["statusline", "quota", "usage", "status-bar"],
   "author": "guo",

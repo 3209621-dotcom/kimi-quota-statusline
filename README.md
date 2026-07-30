@@ -1,70 +1,74 @@
 # Kimi Quota Statusline
 
-Kimi Code CLI 底部状态栏增强插件:把底部第一行替换为信息密集的彩色状态栏,额度数据**与 `/usage` 完全同源**(直连官方 `GET /coding/v1/usages` 接口)。
+[中文文档](README.zh-CN.md)
+
+A status line plugin for [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) (≥ 0.30.0). It replaces the footer's first line with a dense, colorful status bar whose quota data comes **straight from the official `GET /coding/v1/usages` endpoint — the same source as the built-in `/usage` command**.
 
 ```
 YOLO · K3·max [1M] · 5h ███░░░ 55% 1h25m · 7d █████░ 85% 12h25m · 今日 37.6M ¥117.96 · pollen-project
 ```
 
-swarm 模式激活时整行加边框特效 + swarm 反色高亮:
+When **swarm mode** is entered, a brand-blue (`#4FA8FF`) water ripple spreads outward from the `swarm` marker for ~8 seconds, then settles back to a static brand-blue badge:
 
 ```
-⟦ YOLO · K3·max [1M] ·  swarm  · 5h ███░░░ 58% 1h20m · 7d █████░ 85% 12h20m · 今日 40.9M ¥125.15 · pollen-project ⟧
+YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d █████░ 85% 12h20m · 今日 40.9M ¥125.15 · pollen-project
 ```
 
-## 显示内容
+## What it shows
 
-| 段 | 内容 | 数据来源 |
-|---|---|---|
-| 权限模式 | `YOLO` / `AUTO` / `MANUAL`(大写,分色) | 状态栏 stdin 快照 |
-| 模型·思考强度 `[上下文]` | `K3·max [1M]`,强度从当前会话 wire 日志重建 | wire.jsonl |
-| swarm 特效 | 整行 `⟦ ⟧` 品红边框 + 反色块(仅激活时) | wire.jsonl `swarm_mode.*` |
-| `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时,绿/黄/红三档 | **官方 `/usages` 接口**(10 分钟内有效,失败回退本地校准值) |
-| 今日消耗 | token 量 + 估算金额 | wire.jsonl `usage.record` 聚合 |
-| git 分支 / 项目目录 | ⎇ 分支、目录名 | stdin 快照 |
+| Segment | Content | Source |
+| --- | --- | --- |
+| Permission mode | `YOLO` / `AUTO` / `MANUAL` (uppercase, color-coded) | status line stdin snapshot |
+| Model · effort `[context]` | `K3·max [1M]`; effort rebuilt from the session wire log | `wire.jsonl` |
+| swarm effect | water-ripple burst on entry, then a static brand-blue marker | `wire.jsonl` `swarm_mode.*` |
+| `5h` / `7d` quota bars | 6-cell bar + used % + reset countdown, green/yellow/red | **official `/usages` endpoint** (fresh ≤ 10 min, calibrated fallback) |
+| Today's usage | tokens + estimated cost | `wire.jsonl` `usage.record` aggregation |
+| git branch / directory | ⎇ branch, basename of cwd | stdin snapshot |
 
-## 金额口径
+## Cost estimation
 
-按 Kimi 开放平台官方定价逐条累计(K3:输入 ¥20/百万 token、缓存命中 ¥2/百万、输出 ¥100/百万;缓存创建按标准输入价计)。是"等值估算",套餐内实际不扣费。
+Per-token pricing follows Kimi's official open-platform rates (K3: input ¥20/M tokens, cached input ¥2/M, output ¥100/M; cache creation billed as standard input). It is an *equivalent* estimate — plan usage itself is not billed per token.
 
-## 安装
+## Install
 
-方式一(推荐,作为插件):
+As a plugin (recommended):
 
 ```
-/plugins install <本仓库路径或 GitHub URL>
-/kimi-quota-statusline:install     # 让 Agent 运行安装脚本并生效
+/plugins install https://github.com/3209621-dotcom/kimi-quota-statusline
+/kimi-quota-statusline:install
 ```
 
-方式二(手动):
+Or manually:
 
 ```bash
-bash install.sh     # 自动备份 tui.toml、写入 [status_line].command、kimi doctor 校验
-# 然后在 TUI 运行 /reload-tui
+git clone https://github.com/3209621-dotcom/kimi-quota-statusline.git
+bash kimi-quota-statusline/install.sh   # backs up tui.toml, writes [status_line].command, validates with kimi doctor
+# then run /reload-tui in the TUI
 ```
 
-要求:Kimi Code CLI ≥ 0.30.0(`[status_line]` 特性),Python 3(状态栏脚本),macOS / Linux。
+Requirements: Kimi Code CLI ≥ 0.30.0 (the `[status_line]` feature), Python 3, macOS / Linux.
 
-## 卸载
+## Uninstall
 
 ```
-/kimi-quota-statusline:uninstall   # 或手动 bash uninstall.sh
+/kimi-quota-statusline:uninstall    # or: bash uninstall.sh
 ```
 
-恢复官方默认状态栏。
+Restores the built-in footer layout.
 
-## 工作原理
+## How it works
 
-- `tui.toml` 的 `[status_line].command` 指向 `statusline.py`,TUI 每秒以内把 JSON 快照(模型/目录/git/权限/上下文用量/sessionId)喂给它,取 stdout 第一行渲染
-- 思考强度与 swarm 状态:快照没有,从当前会话 `~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl` 尾部记录重建
-- token/金额:聚合全部会话 wire.jsonl 的 `usage.record`(按文件 mtime 增量缓存;重活由 detached 后台进程刷新,状态栏单次运行 <50ms,远低于 300ms 预算)
-- 额度百分比:官方 `GET https://api.kimi.com/coding/v1/usages`(Bearer 用本地 OAuth token,与 `/usage` 命令同源);拉取失败时回退到脚本顶部的校准常量
+- `[status_line].command` in `tui.toml` points at `statusline.py`. The TUI pipes a JSON snapshot (model, cwd, git branch, permission/plan mode, context usage, session id, version) on stdin, at most once per second, and renders the first stdout line.
+- Thinking effort and swarm state are not in the snapshot; they are rebuilt from the current session's `~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl` tail records.
+- Token/cost figures aggregate `usage.record` entries across all session wire logs, cached per file mtime; heavy scans run in a detached refresher so the status line itself stays under ~50 ms (budget: 300 ms).
+- Quota percentages come from the official `GET https://api.kimi.com/coding/v1/usages` (Bearer = local OAuth token — the exact endpoint `/usage` uses, see `packages/oauth/src/managed-usage.ts` in kimi-code). If the fetch fails (e.g. expired token), calibrated constants at the top of the script are used as fallback.
+- Animation frame rate is bounded by the TUI's hardcoded 1 s rerun interval (`STATUS_LINE_RERUN_INTERVAL_MS`) — see [issue #2396](https://github.com/MoonshotAI/kimi-code/issues/2396) for the request to make it configurable.
 
-## 配置
+## Configuration
 
-- `KIMI_SL_NOCOLOR=1`:关闭 ANSI 颜色(纯文本)
-- `statusline.py` 顶部常量:`PLAN_5H_LIMIT` / `PLAN_7D_LIMIT`(官方接口不可用时的校准回退)、`PRICE_*`(定价)、`USAGES_URL`
+- `KIMI_SL_NOCOLOR=1` — disable ANSI colors (plain text).
+- Top-of-file constants in `statusline.py`: `PLAN_5H_LIMIT` / `PLAN_7D_LIMIT` (calibrated fallback when the official endpoint is unreachable), `PRICE_*` (token pricing), `USAGES_URL`, `BURST_S` (effect duration).
 
 ## License
 
-MIT
+[MIT](LICENSE)

@@ -1,0 +1,86 @@
+# 维护交接文档(MAINTAINING)
+
+> 本文档面向本项目的后续维护者(包括未来的自己/新会话的 Agent),说明架构、数据通道、开发调试与发布流程。
+> 读完这份文档即可独立维护,不需要原始会话上下文。
+
+## 一、这个项目是什么
+
+Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`statusline.py`(Python 3,零依赖)。
+通过 `tui.toml` 的 `[status_line].command` 接入 TUI:TUI 每秒(硬编码上限)把 JSON 快照喂给 stdin,取 stdout 第一行渲染到底部第一行。
+
+- 仓库:https://github.com/3209621-dotcom/kimi-quota-statusline
+- 本机项目目录(维护真源):`/Users/guo/Projects/kimi-quota-statusline`
+- 最终用户的安装形态:`/plugins install` 后由 CLI 拷贝到 `~/.kimi-code/plugins/managed/kimi-quota-statusline/`,`install.sh` 把 command 指向那里的 statusline.py
+
+## 二、文件地图
+
+| 文件 | 作用 |
+|---|---|
+| `statusline.py` | 状态栏本体(全部逻辑) |
+| `kimi.plugin.json` | 插件清单(name/version/interface/commands);**发布时记得升 version** |
+| `install.sh` / `uninstall.sh` | 幂等安装器:备份 tui.toml → 写入/移除 `[status_line].command` → `kimi doctor tui` 校验 |
+| `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
+| `README.md` / `README.zh-CN.md` | 英文为主,中文附链;**任何行为变化必须双语同步** |
+| `CHANGELOG.md` | Keep a Changelog 格式 |
+| `docs/MAINTAINING.md` | 本文档 |
+
+运行时产生的文件(在 `~/.kimi-code/`,不入库):
+`statusline-tokens.json`(token/金额/官方额度缓存)、`statusline-stdin.json`(最近一次 stdin 快照,调试用)、`statusline-refresh.lock`(刷新锁)。
+
+## 三、数据通道(改代码前必读)
+
+1. **stdin 快照**(TUI → 脚本):`{model, cwd, gitBranch, permissionMode, planMode, contextUsage(0-1小数), contextTokens, maxContextTokens, sessionId, version}`。来源:`apps/kimi-code/src/tui/utils/status-line-command.ts`。
+2. **会话 wire 日志**(`~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl`,JSONL):
+   - `config.update` / `llm.request` → 当前思考强度(`thinkingEffort`)
+   - `swarm_mode.enter` / `swarm_mode.exit` → swarm 状态与进入时间(动效触发)
+   - `usage.record` → token 消耗:`usage.{inputOther, output, inputCacheRead, inputCacheCreation}`,时间字段 `time`(epoch ms)
+3. **官方额度接口**:`GET https://api.kimi.com/coding/v1/usages`,Bearer 用 `~/.kimi-code/credentials/kimi-code.json` 的 `access_token`(15 分钟有效期,CLI 运行时自动续)。返回 `usage`(周配额)+ `limits[]`(5h=300 TIME_UNIT_MINUTE),`used/limit` 为百分制。出处:kimi-code 仓库 `packages/oauth/src/managed-usage.ts`。
+4. **额度回退**:接口失败时用脚本顶部 `PLAN_5H_LIMIT / PLAN_7D_LIMIT` 校准常量(用 `/usage` 百分比反推),`WEEK_RESET_TS` 对齐周配额周期。
+
+## 四、关键机制
+
+- **增量缓存**:`refresh_cache()` 聚合 token/金额,按 wire 文件 mtime 增量;主流程发现缓存超过 `STALE_S`(20s)就 `Popen` 一个 detached `--refresh` 进程,自己用旧值先渲染 —— 状态栏永远 <50ms(预算 300ms)。
+- **官方额度缓存**:`fetch_official()` 挂在 refresh 进程里,成功才覆盖,失败保留上次;超过 `OFFICIAL_FRESH_S`(600s)未更新则回退校准值。
+- **swarm 动效**:`enter_ts` 来自最近一条 `swarm_mode.enter`,`elapsed < BURST_S`(8s)时整行走 `brand_flow()` 双波干涉水波;超时后只剩静态品牌蓝 `swarm` 段。重新进入会再次触发。
+- **动画帧率上限**:TUI `STATUS_LINE_RERUN_INTERVAL_MS=1000` 硬编码,任何动效都是 1fps。已提 issue:[MoonshotAI/kimi-code#2396](https://github.com/MoonshotAI/kimi-code/issues/2396)(请求做成可配)。若未来官方放开,把 `brand_flow` 的速度参数调小即可变丝滑。
+
+## 五、开发与调试
+
+```bash
+cd /Users/guo/Projects/kimi-quota-statusline
+# 改 statusline.py 后,本机状态栏 1 秒内自动生效(tui.toml 指向本项目文件)
+
+# 手动渲染测试(用最近一次真实快照):
+cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py
+# 纯文本模式:
+cat ~/.kimi-code/statusline-stdin.json | KIMI_SL_NOCOLOR=1 python3 statusline.py
+# 强制重算 token 缓存:
+python3 statusline.py --refresh
+# 计时(必须远小于 300ms):
+time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null)
+```
+
+模拟 swarm 状态(不切换真实模式):在 `~/.kimi-code/sessions/wd_test_x/<sessionId>/agents/main/wire.jsonl` 写入伪造的 `swarm_mode.enter` 记录(time 用当前 epoch ms),stdin JSON 的 sessionId 指向它即可;测完删除 `wd_test_x`。
+
+## 六、发布流程
+
+1. 改代码 + 本地测试(上面清单)。
+2. 双语 README 同步;`CHANGELOG.md` 记录;`kimi.plugin.json` 的 `version` 升号。
+3. `git add -A && git commit && git push`(origin = GitHub 仓库)。
+4. 大版本可打 tag:`git tag v1.x.0 && git push --tags`。
+5. 已安装的用户侧升级:`/plugins` 面板 Installed 页会有更新提示,Enter 更新;或重新跑 install 命令。
+
+## 七、已知的坑(别再踩)
+
+- 官方额度接口是 `/usages`(**复数**),不是 `/usage`。
+- access_token 只有 900s 有效期,不要在脚本里用 refresh_token 自己续(会顶坏 CLI 的凭据轮换);过期就回退校准值,等 CLI 续上自然恢复。
+- `[status_line].command` 只接管底部**第一行**;第二行(原生 context 读数)是 `footer.ts` 写死的,关不掉,所以本插件不显示 ctx 条(避免重复)。
+- 不要把耗时操作放进主流程(300ms 超时会被 SIGKILL,整行回退内置布局)——重活一律走 detached refresh。
+- 多行输出无效:只有 stdout 第一行会被渲染。
+
+## 八、路线图(想法池)
+
+- Extra Usage 钱包余额段(接口 `boosterWallet` 已返回,目前 STATUS_DISABLED 未启用)
+- 并发会话段(接口 `parallel`:limit 30 + 活跃会话数)
+- 官方若放开刷新间隔(issue #2396):动效改 10fps
+- per-model 定价表(目前统一按 K3)
