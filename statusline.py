@@ -51,6 +51,7 @@ REVERSE = '\033[7m'
 # swarm 动效:逐秒换帧(脚本无状态,帧号 = 当前秒数)
 RAINBOW = [201, 165, 129, 93, 63, 39, 45, 51]  # 品红→紫→蓝→青 256 色循环
 SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+ANSI_RE = __import__('re').compile(r'\033\[[0-9;]*m')
 
 
 def c256(text, n, *extra):
@@ -230,6 +231,22 @@ def reset_hint(iso):
         return ''
 
 
+def rainbow_line(text, frame):
+    """整行彩虹渐变波:每个字符一个色相,随秒数流动(24-bit 真彩色)。"""
+    import colorsys
+    out, i = [], 0
+    for ch in text:
+        if ch == ' ':
+            out.append(' ')
+            continue
+        hue = (i * 3.0 + frame * 25.0) % 360
+        r, g, b = colorsys.hls_to_rgb(hue / 360.0, 0.62, 1.0)
+        out.append(f'\033[38;2;{int(r * 255)};{int(g * 255)};{int(b * 255)}m\033[1m{ch}')
+        i += 1
+    out.append(RESET)
+    return ''.join(out)
+
+
 def session_state(session_id):
     """从当前会话 wire.jsonl 尾部重建 (思考强度, swarm是否激活)。"""
     effort, swarm = '', False
@@ -363,10 +380,12 @@ def main():
         line1.append(c(os.path.basename(str(cwd).rstrip('/')), BLUE))
 
     out = sep().join(line1) if line1 else 'kimi-code'
-    if swarm:
-        rc = RAINBOW[frame % len(RAINBOW)]
-        out = c256('⟦ ', rc, BOLD) + out + c256(' ⟧', rc, BOLD)  # swarm 彩虹边框逐秒变色
-    print(out)
+    if swarm and USE_ANSI:
+        # ultracode 级特效:整行彩虹渐变波,逐秒流动(剥掉分段色,全行上色)
+        plain = ANSI_RE.sub('', out)
+        print(rainbow_line(plain, frame))
+    else:
+        print(out)
 
 
 if __name__ == '__main__':
