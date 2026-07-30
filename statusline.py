@@ -47,6 +47,16 @@ PRICE_CACHE_READ = 2.0
 USE_ANSI = os.environ.get('KIMI_SL_NOCOLOR') != '1'
 RESET, BOLD, DIM = '\033[0m', '\033[1m', '\033[2m'
 REVERSE = '\033[7m'
+
+# swarm 动效:逐秒换帧(脚本无状态,帧号 = 当前秒数)
+RAINBOW = [201, 165, 129, 93, 63, 39, 45, 51]  # 品红→紫→蓝→青 256 色循环
+SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+
+
+def c256(text, n, *extra):
+    if not USE_ANSI:
+        return text
+    return f'\033[38;5;{n}m' + ''.join(extra) + str(text) + RESET
 CYAN, GREEN, YELLOW, RED, MAGENTA, BLUE, GRAY = (
     '\033[36m', '\033[32m', '\033[33m', '\033[31m', '\033[35m', '\033[34m', '\033[90m')
 
@@ -303,9 +313,11 @@ def main():
             seg += ' ' + c(f'[{fmt_ctx(max_ctx)}]', DIM)
         line1.append(seg)
 
-    # swarm(反色高亮,激活才显示)
+    # swarm 动效:旋转体 + 反色高亮(激活才显示),整行彩虹循环色边框
+    frame = int(time.time())
     if swarm:
-        line1.append(c(' swarm ', MAGENTA, BOLD, REVERSE))
+        spin = SPINNER[frame % len(SPINNER)]
+        line1.append(c256(f'{spin} swarm ', RAINBOW[frame % len(RAINBOW)], BOLD, REVERSE))
 
     # 上下文条:原生 UI(line 2)已有,这里不重复
 
@@ -352,7 +364,8 @@ def main():
 
     out = sep().join(line1) if line1 else 'kimi-code'
     if swarm:
-        out = c('⟦ ', MAGENTA, BOLD) + out + c(' ⟧', MAGENTA, BOLD)  # swarm 整行边框特效
+        rc = RAINBOW[frame % len(RAINBOW)]
+        out = c256('⟦ ', rc, BOLD) + out + c256(' ⟧', rc, BOLD)  # swarm 彩虹边框逐秒变色
     print(out)
 
 
