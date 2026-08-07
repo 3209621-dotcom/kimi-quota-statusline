@@ -20,7 +20,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `kimi.plugin.json` | 插件清单(name/version/interface/commands);**发布时记得升 version** |
 | `install.sh` / `uninstall.sh` | 幂等安装器:备份 tui.toml → 写入/移除 `[status_line].command` → `kimi doctor tui` 校验 |
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
-| `README.md` / `README.zh-CN.md` | 英文为主,中文附链;**任何行为变化必须双语同步** |
+| `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
 | `docs/MAINTAINING.md` | 本文档 |
 
