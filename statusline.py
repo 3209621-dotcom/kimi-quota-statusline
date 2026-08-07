@@ -5,8 +5,9 @@ stdin 收到 CLI 的 JSON 快照,stdout 替换底部状态栏(支持两行)。
 运行预算 300ms,每秒最多一次 —— token 统计走缓存,重活由后台 detached 进程刷新。
 
 第一行:权限 · 模型·强度 [上下文规格] · swarm · 上下文额度条 · 5h消耗 · 7d消耗
-第二行:今日 token · 项目目录
-- 5h/7d/今日消耗:本地会话 wire.jsonl 的 usage.record 按时间窗聚合(真实数据)
+第二行:本会话 token+金额 · 项目目录
+- 5h/7d 消耗:全部会话 wire.jsonl 的 usage.record 按时间窗聚合(真实数据)
+- 本会话 token/金额:仅当前会话 wire.jsonl 的 usage.record 聚合
 - 思考强度/swarm:当前会话 wire.jsonl 尾部记录重建
 - ANSI 彩色;KIMI_SL_NOCOLOR=1 回退纯文本
 """
@@ -116,7 +117,7 @@ def fmt_ctx(n):
 
 
 # ---------- token 聚合 + 官方额度(后台刷新进程执行) ----------
-def fetch_official():
+def fetch_official(ver=''):
     """拉官方额度:周配额(usage)+ 5h 窗口(limits[])。token 过期或失败返回 None。"""
     import urllib.request
     try:
@@ -125,7 +126,8 @@ def fetch_official():
             return None
         req = urllib.request.Request(USAGES_URL, headers={
             'Authorization': f"Bearer {cred['access_token']}",
-            'Accept': 'application/json', 'User-Agent': 'kimi-code-cli/0.30.0'})
+            'Accept': 'application/json',
+            'User-Agent': f'kimi-code-cli/{ver}' if ver else 'kimi-code-cli'})
         with urllib.request.urlopen(req, timeout=8) as r:
             d = json.loads(r.read().decode())
         out = {'ts': time.time()}
@@ -147,18 +149,16 @@ def fetch_official():
         return None
 
 
-def refresh_cache():
+def refresh_cache(session_id='', ver=''):
     now_ms = int(time.time() * 1000)
-    lt = time.localtime()
-    t_today = int(time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1)) * 1000)
     t_5h = now_ms - 5 * 3600 * 1000
     # 周窗口对齐套餐重置周期(非滚动 7 天)
     reset = WEEK_RESET_TS
     while time.time() > reset:
         reset += 7 * 86400
     t_week = int((reset - 7 * 86400) * 1000)
-    today = h5 = d7 = 0
-    today_cost = h5_cost = d7_cost = 0.0
+    h5 = d7 = 0
+    h5_cost = d7_cost = 0.0
     for root, _dirs, names in os.walk(SESSIONS):
         if 'wire.jsonl' not in names:
             continue
@@ -188,27 +188,56 @@ def refresh_cache():
                             + u.get('inputCacheCreation', 0) * PRICE_INPUT) / 1e6
                     d7 += s
                     d7_cost += cost
-                    if t >= t_today:
-                        today += s
-                        today_cost += cost
                     if t >= t_5h:
                         h5 += s
                         h5_cost += cost
         except OSError:
             continue
+    # 本会话 token/金额:只扫当前会话的 wire.jsonl
+    sess = None
+    if session_id:
+        hits = glob.glob(os.path.join(SESSIONS, '*', session_id, 'agents', 'main', 'wire.jsonl'))
+        if hits:
+            n, amt = 0, 0.0
+            try:
+                with open(hits[0], 'rb') as f:
+                    for line in f:
+                        if b'usage.record' not in line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except ValueError:
+                            continue
+                        if rec.get('type') != 'usage.record':
+                            continue
+                        u = rec.get('usage', {})
+                        n += (u.get('inputOther', 0) + u.get('output', 0)
+                              + u.get('inputCacheRead', 0) + u.get('inputCacheCreation', 0))
+                        amt += (u.get('inputOther', 0) * PRICE_INPUT
+                                + u.get('output', 0) * PRICE_OUTPUT
+                                + u.get('inputCacheRead', 0) * PRICE_CACHE_READ
+                                + u.get('inputCacheCreation', 0) * PRICE_INPUT) / 1e6
+            except OSError:
+                pass
+            sess = {'id': session_id, 'tokens': n, 'cost': amt}
     tmp = CACHE + '.tmp'
     # 官方额度:拉取成功则更新,失败保留上次结果
-    official = fetch_official()
-    if official is None:
+    official = fetch_official(ver)
+    prev = {}
+    if official is None or sess is None:
         try:
-            official = json.load(open(CACHE)).get('official')
+            prev = json.load(open(CACHE))
         except Exception:
-            official = None
+            prev = {}
+    if official is None:
+        official = prev.get('official')
+    if sess is None:
+        sess = prev.get('sess')
     try:
         with open(tmp, 'w') as f:
-            json.dump({'ts': time.time(), 'today': today, 'h5': h5, 'd7': d7,
-                       'today_cost': today_cost, 'h5_cost': h5_cost, 'd7_cost': d7_cost,
-                       'official': official}, f)
+            json.dump({'ts': time.time(), 'h5': h5, 'd7': d7,
+                       'h5_cost': h5_cost, 'd7_cost': d7_cost,
+                       'sess': sess, 'official': official}, f)
         os.replace(tmp, CACHE)
     except OSError:
         pass
@@ -218,8 +247,8 @@ def refresh_cache():
         pass
 
 
-def load_tokens():
-    """读缓存;过期则 detached 刷新,当前用旧值先显示。"""
+def load_tokens(session_id='', ver=''):
+    """读缓存;过期则 detached 刷新(带上 sessionId 统计本会话消耗、ver 作 UA),当前用旧值先显示。"""
     try:
         cache = json.load(open(CACHE))
     except Exception:
@@ -229,7 +258,7 @@ def load_tokens():
         try:
             if not os.path.exists(LOCK) or time.time() - os.stat(LOCK).st_mtime > LOCK_S:
                 open(LOCK, 'w').close()
-                subprocess.Popen([sys.executable, os.path.abspath(__file__), '--refresh'],
+                subprocess.Popen([sys.executable, os.path.abspath(__file__), '--refresh', session_id, ver],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True)
         except OSError:
@@ -321,7 +350,8 @@ def main():
     except OSError:
         pass
 
-    tokens = load_tokens()
+    sid = pick(snap, 'sessionId', 'session_id')
+    tokens = load_tokens(sid, str(snap.get('version') or ''))
     line1 = []
 
     # 权限模式最前(大写)
@@ -335,7 +365,7 @@ def main():
     model = pick(snap, 'model', 'model_alias', 'modelAlias')
     if isinstance(model, dict):
         model = pick(model, 'alias', 'id', 'name')
-    effort, swarm, enter_ts = session_state(pick(snap, 'sessionId', 'session_id'))
+    effort, swarm, enter_ts = session_state(sid)
     if model:
         seg = c(str(model).split('/')[-1], CYAN, BOLD) + (c('·' + effort, DIM) if effort else '')
         max_ctx = pick(snap, 'maxContextTokens', 'max_context_tokens', default=0) or 0
@@ -377,18 +407,25 @@ def main():
     if isinstance(git, dict):
         git = pick(git, 'branch', 'name')
     if git:
+        git = str(git)
+        if len(git) > 24:  # 分支名过长会撑爆状态栏,截断保留头部
+            git = git[:23] + '…'
         line1.append(c(f'⎇ {git}', GREEN))
 
-    # 今日 token + 金额(按官方定价) + 项目目录
-    if tokens:
-        seg = c(f"今日 {fmt_tokens(tokens.get('today', 0))}", YELLOW)
-        cost = tokens.get('today_cost')
+    # 本会话 token + 金额(按官方定价) + 项目目录
+    sess = tokens.get('sess') or {}
+    if sid and sess.get('id') == sid:
+        seg = c(fmt_tokens(sess.get('tokens', 0)), YELLOW)
+        cost = sess.get('cost')
         if cost is not None:
             seg += ' ' + c(f'¥{cost:.2f}', YELLOW, BOLD)
         line1.append(seg)
     cwd = pick(snap, 'cwd', 'work_dir', 'workDir')
     if cwd:
-        line1.append(c(os.path.basename(str(cwd).rstrip('/')), BLUE))
+        d = os.path.basename(str(cwd).rstrip('/'))
+        if len(d) > 20:
+            d = d[:19] + '…'
+        line1.append(c(d, BLUE))
 
     out = sep().join(line1) if line1 else 'kimi-code'
     elapsed = time.time() - enter_ts if (swarm and enter_ts) else 1e9
@@ -401,6 +438,7 @@ def main():
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '--refresh':
-        refresh_cache()
+        refresh_cache(sys.argv[2] if len(sys.argv) > 2 else '',
+                      sys.argv[3] if len(sys.argv) > 3 else '')
     else:
         main()

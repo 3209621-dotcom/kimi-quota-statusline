@@ -5,13 +5,13 @@
 Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密集的彩色状态栏，额度数据**与 `/usage` 完全同源**（直连官方 `GET /coding/v1/usages` 接口）。
 
 ```
-YOLO · K3·max [1M] · 5h ███░░░ 55% 1h25m · 7d █████░ 85% 12h25m · 今日 37.6M ¥117.96 · pollen-project
+YOLO · K3·max [1M] · 5h ███░░░ 55% 1h25m · 7d █████░ 85% 12h25m · 37.6M ¥117.96 · pollen-project
 ```
 
 进入 **swarm 模式**时，品牌蓝(`#4FA8FF`）水波自 `swarm` 标记处向两侧荡开，约 8 秒后收敛为静态品牌蓝标记：
 
 ```
-YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d █████░ 85% 12h20m · 今日 40.9M ¥125.15 · pollen-project
+YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d █████░ 85% 12h20m · 40.9M ¥125.15 · pollen-project
 ```
 
 ## 显示内容
@@ -22,7 +22,7 @@ YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d ███
 | 模型·思考强度 `[上下文]` | `K3·max [1M]`，强度从当前会话 wire 日志重建 | wire.jsonl |
 | swarm 特效 | 进入时品牌蓝水波双向扩散（~8s)，随后静态蓝标 | wire.jsonl `swarm_mode.*` |
 | `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时，绿/黄/红三档 | **官方 `/usages` 接口**（10 分钟内有效，失败回退校准值） |
-| 今日消耗 | token 量 + 估算金额 | wire.jsonl `usage.record` 聚合 |
+| 本会话消耗 | token 量 + 估算金额（仅当前会话，不含其他会话） | 当前会话 wire.jsonl `usage.record` 聚合 |
 | git 分支 / 项目目录 | ⎇ 分支、目录名 | stdin 快照 |
 
 ## 金额口径
@@ -60,7 +60,7 @@ bash kimi-quota-statusline/install.sh   # 自动备份 tui.toml、写入 [status
 
 - `tui.toml` 的 `[status_line].command` 指向 `statusline.py`,TUI 每秒以内把 JSON 快照（模型/目录/git/权限/上下文用量/sessionId）喂给它，取 stdout 第一行渲染
 - 思考强度与 swarm 状态：快照没有，从当前会话 `~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl` 尾部记录重建
-- token/金额：聚合全部会话 wire.jsonl 的 `usage.record`（按文件 mtime 增量缓存；重活由 detached 后台进程刷新，状态栏单次运行 <50ms，远低于 300ms 预算）
+- token/金额：5h/7d 聚合全部会话 wire.jsonl 的 `usage.record`;"会话"段只聚合当前会话的 wire.jsonl（按文件 mtime 增量缓存；重活由 detached 后台进程刷新，状态栏单次运行 <50ms，远低于 300ms 预算）
 - 额度百分比：官方 `GET https://api.kimi.com/coding/v1/usages`(Bearer 用本地 OAuth token，与 `/usage` 命令同源，见 kimi-code 仓库 `packages/oauth/src/managed-usage.ts`)；拉取失败时回退到脚本顶部的校准常量
 - 动画帧率受 TUI 硬编码的 1 秒重跑间隔限制（`STATUS_LINE_RERUN_INTERVAL_MS`)，可配置化请求见 [issue #2396](https://github.com/MoonshotAI/kimi-code/issues/2396)
 
