@@ -70,7 +70,18 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 4. 大版本可打 tag:`git tag v1.x.0 && git push --tags`。
 5. 已安装的用户侧升级:`/plugins` 面板 Installed 页会有更新提示,Enter 更新;或重新跑 install 命令。
 
-## 七、已知的坑(别再踩)
+## 七、CLI 更新后的兼容性巡检
+
+Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.31.1(2026-08-07 全部通过)。
+
+1. **官方 changelog 对照**:https://www.kimi.com/code/docs/en/kimi-code-cli/release-notes/changelog.html ,搜 status_line / plugin / wire / usages 相关条目。
+2. **stdin 快照字段**:`cat ~/.kimi-code/statusline-stdin.json` —— 应含 `model, cwd, gitBranch, permissionMode, planMode, contextUsage, contextTokens, maxContextTokens, sessionId, version`。
+3. **wire 记录存在性**:对当前会话 `~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl` 分别 `grep -c` `usage.record` / `thinkingEffort` / `swarm_mode`,均应 >0。
+4. **官方额度接口**:`python3 -c "import statusline; print(statusline.fetch_official())"` 应返回含 `wk_limit` 的 dict(token 过期时返回 None,属预期回退,先确认 CLI 在线再判失败)。
+5. **配置校验**:`kimi doctor tui`。
+6. **手动渲染 + 计时**:`cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py` 单行无报错;`time` 实测远小于 300ms。
+
+## 八、已知的坑(别再踩)
 
 - 官方额度接口是 `/usages`(**复数**),不是 `/usage`。
 - access_token 只有 900s 有效期,不要在脚本里用 refresh_token 自己续(会顶坏 CLI 的凭据轮换);过期就回退校准值,等 CLI 续上自然恢复。
@@ -78,7 +89,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 - 不要把耗时操作放进主流程(300ms 超时会被 SIGKILL,整行回退内置布局)——重活一律走 detached refresh。
 - 多行输出无效:只有 stdout 第一行会被渲染。
 
-## 八、路线图(想法池)
+## 九、路线图(想法池)
 
 - Extra Usage 钱包余额段(接口 `boosterWallet` 已返回,目前 STATUS_DISABLED 未启用)
 - 并发会话段(接口 `parallel`:limit 30 + 活跃会话数)
