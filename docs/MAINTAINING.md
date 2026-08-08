@@ -22,6 +22,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
+| `tests/test_regressions.py` | 回归测试(无框架):额度口径 4 例 + swarm 分块扫描 5 例,`python3 tests/test_regressions.py` |
 | `docs/MAINTAINING.md` | 本文档 |
 
 运行时产生的文件(在 `~/.kimi-code/`,不入库):
@@ -35,11 +36,11 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
    - `swarm_mode.enter` / `swarm_mode.exit` → swarm 状态与进入时间(动效触发)
    - `usage.record` → token 消耗:`usage.{inputOther, output, inputCacheRead, inputCacheCreation}`,时间字段 `time`(epoch ms)
 3. **官方额度接口**:`GET https://api.kimi.com/coding/v1/usages`,Bearer 用 `~/.kimi-code/credentials/kimi-code.json` 的 `access_token`(15 分钟有效期,CLI 运行时自动续)。返回 `usage`(周配额)+ `limits[]`(5h=300 TIME_UNIT_MINUTE),`used/limit` 为百分制。出处:kimi-code 仓库 `packages/oauth/src/managed-usage.ts`。
-4. **额度回退**:接口失败时用脚本顶部 `PLAN_5H_LIMIT / PLAN_7D_LIMIT` 校准常量(用 `/usage` 百分比反推),`WEEK_RESET_TS` 对齐周配额周期。
+4. **额度显示口径**:仅用官方接口数据;超过 `OFFICIAL_FRESH_S`(600s)未更新压暗加 `~` 过期标记,从未拉到则不显示。本地 token 折算回退已于 v1.1.2 移除——与官方窗口非线性,校准漂移曾致 5h 误显 90%+(2026-08-09 用户报告),不要再加回来。
 
 ## 四、关键机制
 
-- **增量缓存**:`refresh_cache()` 聚合 token/金额,按 wire 文件 mtime 增量;主流程发现缓存超过 `STALE_S`(20s)就 `Popen` 一个 detached `--refresh` 进程,自己用旧值先渲染 —— 状态栏永远 <50ms(预算 300ms)。
+- **增量缓存**:`refresh_cache()` 只扫当前会话 wire.jsonl(会话 token/金额)并拉官方额度;主流程发现缓存超过 `STALE_S`(20s)就 `Popen` 一个 detached `--refresh` 进程,自己用旧值先渲染 —— 状态栏永远 <50ms(预算 300ms)。
 - **官方额度缓存**:`fetch_official()` 挂在 refresh 进程里,成功才覆盖,失败保留上次;超过 `OFFICIAL_FRESH_S`(600s)未更新则回退校准值。
 - **swarm 动效**:`enter_ts` 来自最近一条 `swarm_mode.enter`,`elapsed < BURST_S`(8s)时整行走 `brand_flow()` 双波干涉水波;超时后只剩静态品牌蓝 `swarm` 段。重新进入会再次触发。
 - **动画帧率上限**:TUI `STATUS_LINE_RERUN_INTERVAL_MS=1000` 硬编码,任何动效都是 1fps。已提 issue:[MoonshotAI/kimi-code#2396](https://github.com/MoonshotAI/kimi-code/issues/2396)(请求做成可配)。若未来官方放开,把 `brand_flow` 的速度参数调小即可变丝滑。
@@ -64,7 +65,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 
 ## 六、发布流程
 
-1. 改代码 + 本地测试(上面清单)。
+1. 改代码 + 本地测试(上面清单 + `python3 tests/test_regressions.py` 回归测试)。
 2. 双语 README 同步;`CHANGELOG.md` 记录;`kimi.plugin.json` 的 `version` 升号。
 3. `git add -A && git commit && git push`(origin = GitHub 仓库)。
 4. 大版本可打 tag:`git tag v1.x.0 && git push --tags`。

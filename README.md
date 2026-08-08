@@ -21,7 +21,7 @@ YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d ███
 | 权限模式 | `YOLO` / `AUTO` / `MANUAL`（大写，分色） | 状态栏 stdin 快照 |
 | 模型·思考强度 `[上下文]` | `K3·max [1M]`，强度从当前会话 wire 日志重建 | wire.jsonl |
 | swarm 特效 | 进入时品牌蓝水波双向扩散（~8s)，随后静态蓝标 | wire.jsonl `swarm_mode.*` |
-| `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时，绿/黄/红三档 | **官方 `/usages` 接口**（10 分钟内有效，失败回退校准值） |
+| `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时，绿/黄/红三档 | **官方 `/usages` 接口**（超 10 分钟未更新压暗加 `~`，无数据不显示） |
 | 本会话消耗 | token 量 + 估算金额（仅当前会话，不含其他会话） | 当前会话 wire.jsonl `usage.record` 聚合 |
 | git 分支 / 项目目录 | ⎇ 分支、目录名 | stdin 快照 |
 
@@ -61,13 +61,13 @@ bash kimi-quota-statusline/install.sh   # 自动备份 tui.toml、写入 [status
 - `tui.toml` 的 `[status_line].command` 指向 `statusline.py`,TUI 每秒以内把 JSON 快照（模型/目录/git/权限/上下文用量/sessionId）喂给它，取 stdout 第一行渲染
 - 思考强度与 swarm 状态：快照没有，从当前会话 `~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl` 尾部记录重建
 - token/金额：5h/7d 聚合全部会话 wire.jsonl 的 `usage.record`;"会话"段只聚合当前会话的 wire.jsonl（按文件 mtime 增量缓存；重活由 detached 后台进程刷新，状态栏单次运行 <50ms，远低于 300ms 预算）
-- 额度百分比：官方 `GET https://api.kimi.com/coding/v1/usages`(Bearer 用本地 OAuth token，与 `/usage` 命令同源，见 kimi-code 仓库 `packages/oauth/src/managed-usage.ts`)；拉取失败时回退到脚本顶部的校准常量
+- 额度百分比：官方 `GET https://api.kimi.com/coding/v1/usages`(Bearer 用本地 OAuth token，与 `/usage` 命令同源，见 kimi-code 仓库 `packages/oauth/src/managed-usage.ts`)；超过 10 分钟未更新压暗加 `~` 过期标记，从未拉到则不显示（本地 token 折算已于 v1.1.2 移除：与官方窗口非线性，校准漂移曾致误显）
 - 动画帧率受 TUI 硬编码的 1 秒重跑间隔限制（`STATUS_LINE_RERUN_INTERVAL_MS`)，可配置化请求见 [issue #2396](https://github.com/MoonshotAI/kimi-code/issues/2396)
 
 ## 配置
 
 - `KIMI_SL_NOCOLOR=1`：关闭 ANSI 颜色（纯文本）
-- `statusline.py` 顶部常量：`PLAN_5H_LIMIT` / `PLAN_7D_LIMIT`（官方接口不可用时的校准回退）、`PRICE_*`（定价）、`USAGES_URL`、`BURST_S`（特效时长）
+- `statusline.py` 顶部常量：`PRICE_*`（定价）、`USAGES_URL`、`OFFICIAL_FRESH_S`（官方数据新鲜度阈值）、`BURST_S`（特效时长）
 
 ## License
 
@@ -100,7 +100,7 @@ YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d ███
 | Permission mode | `YOLO` / `AUTO` / `MANUAL` (uppercase, color-coded) | status line stdin snapshot |
 | Model · effort `[context]` | `K3·max [1M]`; effort rebuilt from the session wire log | `wire.jsonl` |
 | swarm effect | water-ripple burst on entry, then a static brand-blue marker | `wire.jsonl` `swarm_mode.*` |
-| `5h` / `7d` quota bars | 6-cell bar + used % + reset countdown, green/yellow/red | **official `/usages` endpoint** (fresh ≤ 10 min, calibrated fallback) |
+| `5h` / `7d` quota bars | 6-cell bar + used % + reset countdown, green/yellow/red | **official `/usages` endpoint** (dimmed with a `~` marker when stale > 10 min; hidden when unavailable) |
 | Current session usage | tokens + estimated cost (this session only) | current session's `wire.jsonl` `usage.record` aggregation |
 | git branch / directory | ⎇ branch, basename of cwd | stdin snapshot |
 
@@ -140,13 +140,13 @@ Restores the built-in footer layout.
 - `[status_line].command` in `tui.toml` points at `statusline.py`. The TUI pipes a JSON snapshot (model, cwd, git branch, permission/plan mode, context usage, session id, version) on stdin, at most once per second, and renders the first stdout line.
 - Thinking effort and swarm state are not in the snapshot; they are rebuilt from the current session's `~/.kimi-code/sessions/*/<sessionId>/agents/main/wire.jsonl` tail records.
 - Token/cost figures: 5h/7d quota fallback aggregates `usage.record` entries across all session wire logs; the session figure aggregates only the current session's wire log. Cached per file mtime; heavy scans run in a detached refresher so the status line itself stays under ~50 ms (budget: 300 ms).
-- Quota percentages come from the official `GET https://api.kimi.com/coding/v1/usages` (Bearer = local OAuth token — the exact endpoint `/usage` uses, see `packages/oauth/src/managed-usage.ts` in kimi-code). If the fetch fails (e.g. expired token), calibrated constants at the top of the script are used as fallback.
+- Quota percentages come from the official `GET https://api.kimi.com/coding/v1/usages` (Bearer = local OAuth token — the exact endpoint `/usage` uses, see `packages/oauth/src/managed-usage.ts` in kimi-code). Values older than 10 minutes render dimmed with a `~` stale marker; when no official data has ever been fetched the bars are hidden. (The local token-based fallback was removed in v1.1.2: it is not linear with the official window and its calibration drifted, causing misleading readings.)
 - Animation frame rate is bounded by the TUI's hardcoded 1 s rerun interval (`STATUS_LINE_RERUN_INTERVAL_MS`) — see [issue #2396](https://github.com/MoonshotAI/kimi-code/issues/2396) for the request to make it configurable.
 
 ## Configuration
 
 - `KIMI_SL_NOCOLOR=1` — disable ANSI colors (plain text).
-- Top-of-file constants in `statusline.py`: `PLAN_5H_LIMIT` / `PLAN_7D_LIMIT` (calibrated fallback when the official endpoint is unreachable), `PRICE_*` (token pricing), `USAGES_URL`, `BURST_S` (effect duration).
+- Top-of-file constants in `statusline.py`: `PRICE_*` (token pricing), `USAGES_URL`, `OFFICIAL_FRESH_S` (official-data freshness threshold), `BURST_S` (effect duration).
 
 ## License
 
