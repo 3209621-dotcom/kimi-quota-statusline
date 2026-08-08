@@ -1,6 +1,6 @@
 # Kimi Quota Statusline
 
-[中文独立文档](README.zh-CN.md) · [English version below](#english)
+[中文独立文档](README.zh-CN.md) · [English version below](#english) · [![GitHub stars](https://img.shields.io/github/stars/3209621-dotcom/kimi-quota-statusline?style=social)](https://github.com/3209621-dotcom/kimi-quota-statusline/stargazers)
 
 Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密集的彩色状态栏，额度数据**与 `/usage` 完全同源**（直连官方 `GET /coding/v1/usages` 接口）。
 

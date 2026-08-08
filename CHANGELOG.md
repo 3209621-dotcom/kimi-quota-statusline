@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+- 安装完成后的一次性 Star 提示(install.sh 输出 + install 斜杠命令告知,只提一次)
+- README 顶部 GitHub 星数徽章(shields.io)
+
 ## [1.1.2] - 2026-08-09
 
 ### Fixed

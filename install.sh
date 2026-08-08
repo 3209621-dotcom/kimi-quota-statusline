@@ -46,3 +46,4 @@ if command -v kimi >/dev/null 2>&1; then
   kimi doctor tui "$TUI" && echo "kimi doctor 校验通过"
 fi
 echo "安装完成。在 Kimi Code TUI 中运行 /reload-tui 立即生效(或重开新会话)。"
+echo "觉得好用的话,欢迎给个 Star ⭐ https://github.com/3209621-dotcom/kimi-quota-statusline"
