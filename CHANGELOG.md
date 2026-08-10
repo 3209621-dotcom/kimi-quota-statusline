@@ -7,6 +7,7 @@
 ### Added
 - 安装完成后的一次性 Star 提示(install.sh 输出 + install 斜杠命令告知,只提一次)
 - README 顶部 GitHub 星数徽章(shields.io)
+- README 演示素材:状态栏静态截图 + swarm 水波动效 GIF(`assets/`,附生成器 make_demo.py)
 
 ## [1.1.2] - 2026-08-09
 

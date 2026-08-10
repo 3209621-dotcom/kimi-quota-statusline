@@ -4,15 +4,11 @@
 
 Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密集的彩色状态栏，额度数据**与 `/usage` 完全同源**（直连官方 `GET /coding/v1/usages` 接口）。
 
-```
-YOLO · K3·max [1M] · 5h ███░░░ 55% 1h25m · 7d █████░ 85% 12h25m · 37.6M ¥117.96 · pollen-project
-```
+![状态栏效果](assets/statusline.png)
 
 进入 **swarm 模式**时，品牌蓝(`#4FA8FF`）水波自 `swarm` 标记处向两侧荡开，约 8 秒后收敛为静态品牌蓝标记：
 
-```
-YOLO · K3·max [1M] · swarm · 5h ███░░░ 58% 1h20m · 7d █████░ 85% 12h20m · 40.9M ¥125.15 · pollen-project
-```
+![swarm 水波动效](assets/swarm.gif)
 
 ## 显示内容
 

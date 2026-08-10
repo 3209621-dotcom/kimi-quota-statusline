@@ -23,6 +23,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
 | `tests/test_regressions.py` | 回归测试(无框架):额度口径 4 例 + swarm 分块扫描 5 例,`python3 tests/test_regressions.py` |
+| `assets/` | README 演示素材:`statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
 | `docs/MAINTAINING.md` | 本文档 |
 
 运行时产生的文件(在 `~/.kimi-code/`,不入库):
