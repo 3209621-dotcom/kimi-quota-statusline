@@ -1,6 +1,23 @@
-# Kimi Quota Statusline
+<div align="center">
 
-[中文独立文档](README.zh-CN.md) · [English version below](#english) · [![GitHub stars](https://img.shields.io/github/stars/3209621-dotcom/kimi-quota-statusline?style=social)](https://github.com/3209621-dotcom/kimi-quota-statusline/stargazers)
+<img src="assets/hero.svg" alt="Kimi Quota Statusline — Kimi Code CLI 状态栏增强" width="760" />
+
+<p>
+  <a href="https://github.com/3209621-dotcom/kimi-quota-statusline/tags"><img src="https://img.shields.io/github/v/tag/3209621-dotcom/kimi-quota-statusline?label=version&color=4fa8ff" alt="version" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/python-3-3776ab?logo=python&logoColor=white" alt="Python 3" />
+  <img src="https://img.shields.io/badge/kimi--code-%E2%89%A5%200.30.0-4fa8ff" alt="Kimi Code >= 0.30.0" />
+  <a href="https://github.com/3209621-dotcom/kimi-quota-statusline/stargazers"><img src="https://img.shields.io/github/stars/3209621-dotcom/kimi-quota-statusline?style=social" alt="GitHub stars" /></a>
+</p>
+
+<p>
+  <a href="README.zh-CN.md"><b>中文文档</b></a> ·
+  <a href="#english">English</a>
+</p>
+
+</div>
+
+---
 
 Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密集的彩色状态栏，额度数据**与 `/usage` 完全同源**（直连官方 `GET /coding/v1/usages` 接口）。
 

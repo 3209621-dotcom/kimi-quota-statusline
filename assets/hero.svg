@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 240" role="img" aria-label="Kimi Quota Statusline">
+  <defs>
+    <linearGradient id="wordmark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2f7fff"/>
+      <stop offset="45%" stop-color="#4fa8ff"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+      <animateTransform attributeName="gradientTransform" type="translate" values="-0.3 0; 0.3 0; -0.3 0" dur="6s" repeatCount="indefinite"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2f7fff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#4fa8ff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="type1"><rect x="230" y="150" width="0" height="40"><animate attributeName="width" values="0;420;420;420" keyTimes="0;0.12;0.32;1" dur="13.5s" repeatCount="indefinite"/></rect></clipPath>
+    <clipPath id="type2"><rect x="230" y="150" width="0" height="40"><animate attributeName="width" values="0;0;0;420;420;420" keyTimes="0;0.333;0.345;0.45;0.65;1" dur="13.5s" repeatCount="indefinite"/></rect></clipPath>
+    <clipPath id="type3"><rect x="230" y="150" width="0" height="40"><animate attributeName="width" values="0;0;0;420;420;420" keyTimes="0;0.666;0.678;0.78;0.98;1" dur="13.5s" repeatCount="indefinite"/></rect></clipPath>
+  </defs>
+
+  <text x="440" y="52" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace" font-size="13" letter-spacing="6" fill="#8b949e">QUOTA &amp; USAGE STATUSLINE FOR KIMI CODE CLI</text>
+
+  <text x="440" y="118" text-anchor="middle" font-family="'Segoe UI','PingFang SC','Helvetica Neue',Arial,sans-serif" font-size="58" font-weight="800" fill="url(#wordmark)">Kimi Quota Statusline</text>
+
+  <rect x="290" y="136" width="300" height="2" rx="1" fill="url(#rule)"/>
+
+  <g font-family="'Segoe UI','PingFang SC','Helvetica Neue',Arial,sans-serif" font-size="21" fill="#8b949e">
+    <g clip-path="url(#type1)">
+      <text x="440" y="178" text-anchor="middle">官方额度条：5h / 7d，与 /usage 完全同源</text>
+      <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.32;0.34;1" dur="13.5s" repeatCount="indefinite"/>
+    </g>
+    <g clip-path="url(#type2)" opacity="0">
+      <text x="440" y="178" text-anchor="middle">token 消耗与估算金额，本会话实时可见</text>
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.34;0.35;0.65;0.67;1" dur="13.5s" repeatCount="indefinite"/>
+    </g>
+    <g clip-path="url(#type3)" opacity="0">
+      <text x="440" y="178" text-anchor="middle">进入 swarm 模式，品牌蓝水波荡开</text>
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.67;0.68;0.985;0.995;1" dur="13.5s" repeatCount="indefinite"/>
+    </g>
+    <rect x="440" y="160" width="3" height="24" rx="1.5" fill="#4fa8ff">
+      <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.51;1" dur="1.1s" repeatCount="indefinite"/>
+      <animate attributeName="x" values="230;655;655;230;655;655;230;655;655" keyTimes="0;0.12;0.333;0.345;0.45;0.666;0.678;0.78;1" dur="13.5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <g font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace" font-size="12.5" fill="#6e7681" text-anchor="middle">
+    <text x="200" y="222">官方额度</text>
+    <text x="320" y="222">token 金额</text>
+    <text x="440" y="222">swarm 特效</text>
+    <text x="560" y="222">零依赖</text>
+    <text x="680" y="222">Python 单文件</text>
+  </g>
+</svg>

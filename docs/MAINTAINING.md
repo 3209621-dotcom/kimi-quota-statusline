@@ -23,7 +23,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
 | `tests/test_regressions.py` | 回归测试(无框架):额度口径 4 例 + swarm 分块扫描 5 例,`python3 tests/test_regressions.py` |
-| `assets/` | README 演示素材:`statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
+| `assets/` | `hero.svg`(README 顶部横幅:手写 SVG + SMIL 动画,品牌蓝渐变标题 + 三句打字机标语,改文案直接编辑;本地预览用 Chrome headless 截图)+ 演示素材 `statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
 | `docs/MAINTAINING.md` | 本文档 |
 
 运行时产生的文件(在 `~/.kimi-code/`,不入库):
@@ -74,7 +74,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 
 ## 七、CLI 更新后的兼容性巡检
 
-Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.34.0(2026-08-07 全部通过,含 agent-core-v2 引擎切换)。
+Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.35.0(2026-08-12 全部通过;0.35.0 的 compaction token 计数修复只影响 ctx 读数,本插件不显示 ctx,无影响)。
 
 1. **官方 changelog 对照**:https://www.kimi.com/code/docs/en/kimi-code-cli/release-notes/changelog.html ,搜 status_line / plugin / wire / usages 相关条目。
 2. **stdin 快照字段**:`cat ~/.kimi-code/statusline-stdin.json` —— 应含 `model, cwd, gitBranch, permissionMode, planMode, contextUsage, contextTokens, maxContextTokens, sessionId, version`。
