@@ -50,6 +50,9 @@ def uninstall(tui, plugin_dir, doctor=True):
 
 
 def main():
+    # Windows 控制台 stdout 默认 locale 编码(cp1252/GBK),中文提示会炸;强制 UTF-8
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     kc_home = os.environ.get('KIMI_CODE_HOME', os.path.expanduser('~/.kimi-code'))
     rc = uninstall(os.path.join(kc_home, 'tui.toml'), plugin_dir)

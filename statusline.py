@@ -313,8 +313,10 @@ def pick(d, *keys, default=''):
 
 
 def main():
-    # Windows 控制台 stdin 文本层可能是 GBK/cp1252,直接 .read() 遇到中文快照会炸;
-    # 绕过文本层读原始字节按 UTF-8 解(无 .buffer 的测试替身走原路径)
+    # Windows 控制台 stdio 默认 locale 编码(cp1252/GBK):输入绕过文本层按 UTF-8 解,
+    # 输出强制 UTF-8——否则中文目录名一 print 就 UnicodeEncodeError,整行回退内置布局
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     if hasattr(sys.stdin, 'buffer'):
         raw = sys.stdin.buffer.read().decode('utf-8', 'replace')
     else:

@@ -65,6 +65,9 @@ def install(tui, target, os_name=None, executable=None, doctor=True):
 
 
 def main():
+    # Windows 控制台 stdout 默认 locale 编码(cp1252/GBK),中文提示会炸;强制 UTF-8
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     target = os.path.join(plugin_dir, 'statusline.py')
     if not os.path.isfile(target):

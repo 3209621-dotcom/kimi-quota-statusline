@@ -18,6 +18,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 os.environ['KIMI_SL_NOCOLOR'] = '1'  # 纯文本,便于断言(须在 import 前设置)
 import statusline
 
+# Windows 控制台 stdout 默认 locale 编码(cp1252/GBK),中文用例名会炸;统一按 UTF-8 输出
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 FAILED = []
 
 
@@ -136,6 +140,30 @@ snap_bytes = json.dumps({'sessionId': '', 'version': 't', 'cwd': 'D:/用户/项�
                         ensure_ascii=False).encode('utf-8')
 out = render_bytes(snap_bytes, {'ts': now})
 check('stdin 编码错误 locale:UTF-8 中文目录名正常显示', '项目' in out)
+
+# D. stdout 是非 UTF-8 locale(模拟 Windows en-US 控制台 cp1252):输出强制 UTF-8,
+#    否则中文目录名直接 UnicodeEncodeError,状态栏整行回退内置布局
+fd, path = tempfile.mkstemp(suffix='.json')
+with os.fdopen(fd, 'w') as f:
+    json.dump({'ts': now}, f)
+old_cache, old_stdin, old_stdout = statusline.CACHE, sys.stdin, sys.stdout
+old_dbg = statusline.DEBUG_STDIN
+statusline.CACHE = path
+statusline.DEBUG_STDIN = os.path.join(tempfile.mkdtemp(), 'stdin.json')
+sys.stdin = io.TextIOWrapper(io.BytesIO(snap_bytes), encoding='utf-8')
+raw_out = io.BytesIO()
+sys.stdout = io.TextIOWrapper(raw_out, encoding='cp1252')
+try:
+    statusline.main()
+    sys.stdout.flush()
+    cond = '项目'.encode('utf-8') in raw_out.getvalue()
+except Exception:
+    cond = False
+finally:
+    statusline.CACHE, statusline.DEBUG_STDIN = old_cache, old_dbg
+    sys.stdin, sys.stdout = old_stdin, old_stdout
+    os.unlink(path)
+check('stdout 非 UTF-8 locale:输出强制 UTF-8(中文目录名不乱码)', cond)
 
 # C. 跨平台安装器 install.py / uninstall.py
 try:
