@@ -103,7 +103,7 @@ check('同块 [enter, exit]:不显示 swarm', statusline.session_state(sid)[1] i
 sid, _ = make_wire(10, [enter, exit_, enter])
 check('同块 [enter, exit, enter]:显示 swarm', statusline.session_state(sid)[1] is True)
 
-# ---- TPS:最近 60s 窗口聚合 ----
+# ---- TPS:会话平均 output ÷ 活跃时长(首条→末条记录),常驻不隐藏 ----
 tmp_tps = tempfile.mkdtemp()
 statusline.SESSIONS = tmp_tps
 sid_t = 'sess_tps'
@@ -111,27 +111,39 @@ d_t = os.path.join(tmp_tps, 'wd_t', sid_t, 'agents', 'main')
 os.makedirs(d_t)
 
 
-def rec_t(t_ms, n):
+def rec_t(t_ms, out, inp=0):
     return json.dumps({'type': 'usage.record',
-                       'usage': {'inputOther': n, 'output': 0,
-                                 'inputCacheRead': 0, 'inputCacheCreation': 0},
+                       'usage': {'inputOther': inp, 'output': out,
+                                 'inputCacheRead': inp, 'inputCacheCreation': 0},
                        'time': t_ms})
 
 
 now_ms = int(time.time() * 1000)
 with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
-    f.write('\n'.join([rec_t(now_ms - 61000, 9999),  # 窗口外,不计(时间序在最前)
-                       rec_t(now_ms - 3000, 70),    # 窗口内 70
-                       rec_t(now_ms - 2000, 20),    # 窗口内 20
-                       rec_t(now_ms - 1000, 10)])   # 窗口内 10,合计 100
+    f.write('\n'.join([rec_t(now_ms - 100000, 500, inp=100000),  # 首条,活跃时长起点
+                       rec_t(now_ms - 50000, 300, inp=100000),
+                       rec_t(now_ms, 200, inp=100000)])          # 末条,output 合计 1000
           + '\n')
-check('tps_window:60s 窗口聚合=100/60,窗口外记录不计', statusline.tps_window(sid_t) == 100 / 60)
-check('tps_window:未知会话返回 0', statusline.tps_window('sess_none') == 0.0)
-check('tps_window:空 sessionId 返回 0', statusline.tps_window('') == 0.0)
-# 全窗口外(空闲会话):0
-with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
-    f.write(rec_t(now_ms - 300000, 42) + '\n')
-check('tps_window:全部记录跨出窗口(空闲)返回 0', statusline.tps_window(sid_t) == 0.0)
+
+# refresh_cache 全量扫描时沉淀 out/t0/t1(屏蔽网络与真实缓存路径)
+_old_fetch, _old_cache, _old_lock = (statusline.fetch_official,
+                                     statusline.CACHE, statusline.LOCK)
+statusline.fetch_official = lambda ver='': None
+statusline.CACHE = os.path.join(tmp_tps, 'cache.json')
+statusline.LOCK = os.path.join(tmp_tps, 'lock')
+try:
+    statusline.refresh_cache(sid_t, 'test')
+    _sess = json.load(open(statusline.CACHE))['sess']
+finally:
+    statusline.fetch_official, statusline.CACHE, statusline.LOCK = _old_fetch, _old_cache, _old_lock
+
+check('refresh_cache:沉淀 out/t0/t1(input/cache 不计入 out)',
+      _sess['out'] == 1000 and _sess['t0'] == now_ms - 100000 and _sess['t1'] == now_ms)
+# 活跃时长 100s、output 1000 → 10/s;input/cache 各 30 万不得混入(混入则 ~3010/s)
+check('session_tps:output÷活跃时长=1000/100', statusline.session_tps(_sess) == 1000 / 100)
+check('session_tps:不足 2 条记录(t0==t1)返回 0',
+      statusline.session_tps({'out': 500, 't0': 1000, 't1': 1000}) == 0.0)
+check('session_tps:空 sess/缺字段返回 0', statusline.session_tps({}) == 0.0)
 
 # ---- Windows 适配(v1.2.0):detached 参数 / stdin UTF-8 / 跨平台安装器 ----
 # A. detached 刷新进程的 Popen 参数按平台分支(Windows 用 DETACHED_PROCESS 防闪控制台窗口)

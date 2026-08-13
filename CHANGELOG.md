@@ -2,6 +2,11 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [Unreleased]
+
+### Fixed
+- TPS 口径纠错并改为常驻:只计 output token(input/cacheRead 是每轮重发的上下文,v1.3.0 误计入后真机误显 5.9K/s,真实生成速度仅几十/s);速率改为**会话平均**——累计 output ÷ 活跃时长(首条→末条 usage.record,由后台刷新随 token/金额一并沉淀进缓存),有过 2 条以上记录即常驻显示,不再随空闲隐藏;移除 60s 滚动窗口与 `TPS_WINDOW_S` 常量
+
 ## [1.3.0] - 2026-08-13
 
 ### Added

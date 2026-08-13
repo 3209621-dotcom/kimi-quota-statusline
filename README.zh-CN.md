@@ -27,7 +27,7 @@ Kimi Code CLI 状态栏增强：**额度、消耗、swarm 状态一眼看清**�
 ![swarm 水波动效](assets/swarm.gif)
 
 - ✅ `5h` / `7d` 官方额度条：6 格进度 + 已用百分比 + 重置倒计时，绿/黄/红三档
-- ✅ 本会话 token、估算金额与**实时 TPS**（官方定价口径，仅当前会话）
+- ✅ 本会话 token、估算金额与**会话平均 TPS**（生成速度，常驻显示，仅当前会话）
 - ✅ 权限模式 / 模型·思考强度 / git 分支 / 项目目录
 - ✅ swarm 模式品牌蓝水波动效（约 8 秒）
 - ⚡ 单次运行 < 50ms（token 统计走缓存，300ms 预算内）
@@ -59,7 +59,7 @@ python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusli
 | 模型·思考强度 `[上下文]` | `K3·max [1M]`，强度从当前会话 wire 日志重建 | wire.jsonl |
 | swarm 特效 | 进入时品牌蓝水波双向扩散（~8s），随后静态蓝标 | wire.jsonl `swarm_mode.*` |
 | `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时，绿/黄/红三档 | **官方 `/usages` 接口**（超 10 分钟未更新压暗加 `~`，无数据不显示） |
-| 本会话消耗 | token 量 + 估算金额 + 实时 TPS（仅当前会话，不含其他会话） | 当前会话 wire.jsonl `usage.record` 聚合 |
+| 本会话消耗 | token 量 + 估算金额 + 会话平均 TPS（仅当前会话，不含其他会话） | 当前会话 wire.jsonl `usage.record` 聚合 |
 | git 分支 / 项目目录 | ⎇ 分支、目录名 | stdin 快照 |
 
 ## 金额口径
@@ -85,7 +85,7 @@ python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusli
 ## 配置
 
 - `KIMI_SL_NOCOLOR=1`：关闭 ANSI 颜色（纯文本）
-- `statusline.py` 顶部常量：`PRICE_*`（定价）、`USAGES_URL`、`OFFICIAL_FRESH_S`（官方数据新鲜度阈值）、`BURST_S`（特效时长）、`TPS_WINDOW_S`（TPS 滚动窗口）
+- `statusline.py` 顶部常量：`PRICE_*`（定价）、`USAGES_URL`、`OFFICIAL_FRESH_S`（官方数据新鲜度阈值）、`BURST_S`（特效时长）
 
 ## License
 

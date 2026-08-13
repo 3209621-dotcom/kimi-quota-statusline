@@ -8,7 +8,7 @@ stdin 收到 CLI 的 JSON 快照,stdout 替换底部状态栏(支持两行)。
 - 5h/7d 额度:仅官方 /usages 接口;过期压暗加 ~ 标记,从未拉到则不显示
   (本地 token 折算与官方窗口非线性、校准持续漂移,已于 v1.1.2 移除)
 - 本会话 token/金额:仅当前会话 wire.jsonl 的 usage.record 聚合
-- TPS:最近 60s 窗口的 usage.record 聚合,空闲为 0(隐藏)
+- TPS:会话平均生成速度——累计 output ÷ 活跃时长(首条→末条 usage.record),常驻显示
 - 思考强度/swarm:当前会话 wire.jsonl 自尾向前分块重建(swarm 取全文件最近一条记录)
 - ANSI 彩色;KIMI_SL_NOCOLOR=1 回退纯文本
 """
@@ -39,7 +39,6 @@ OFFICIAL_FRESH_S = 600  # 官方数据 10 分钟内为新鲜;过期压暗加 ~ �
 PRICE_INPUT = 20.0
 PRICE_OUTPUT = 100.0
 PRICE_CACHE_READ = 2.0
-TPS_WINDOW_S = 60    # TPS 统计窗口:最近 60s 的 usage.record 聚合,空闲为 0(隐藏)
 
 USE_ANSI = os.environ.get('KIMI_SL_NOCOLOR') != '1'
 RESET, BOLD, DIM = '\033[0m', '\033[1m', '\033[2m'
@@ -152,7 +151,8 @@ def refresh_cache(session_id='', ver=''):
     if session_id:
         hits = glob.glob(os.path.join(SESSIONS, '*', session_id, 'agents', 'main', 'wire.jsonl'))
         if hits:
-            n, amt = 0, 0.0
+            n, amt, out = 0, 0.0, 0
+            t0 = t1 = None
             try:
                 with open(hits[0], 'rb') as f:
                     for line in f:
@@ -171,9 +171,17 @@ def refresh_cache(session_id='', ver=''):
                                 + u.get('output', 0) * PRICE_OUTPUT
                                 + u.get('inputCacheRead', 0) * PRICE_CACHE_READ
                                 + u.get('inputCacheCreation', 0) * PRICE_INPUT) / 1e6
+                        # 会话平均 TPS 的原料:累计 output + 首/末记录时间(记录按时间序)
+                        out += u.get('output', 0)
+                        t = rec.get('time', 0)
+                        if t:
+                            if t0 is None:
+                                t0 = t
+                            t1 = t
             except OSError:
                 pass
-            sess = {'id': session_id, 'tokens': n, 'cost': amt}
+            sess = {'id': session_id, 'tokens': n, 'cost': amt,
+                    'out': out, 't0': t0, 't1': t1}
     tmp = CACHE + '.tmp'
     # 官方额度:拉取成功则更新,失败保留上次结果
     official = fetch_official(ver)
@@ -305,50 +313,15 @@ def session_state(session_id):
     return effort, swarm, enter_ts
 
 
-def tps_window(session_id, window_s=TPS_WINDOW_S):
-    """当前会话最近 window_s 秒的 token 吞吐(tokens/s)。
-    自 wire.jsonl 尾部向前扫 usage.record:时间戳跨出窗口即停(记录按时间序),
-    上限 4 块(2MB),极端吞吐下截断近似;无记录/空闲返回 0。"""
-    if not session_id:
+def session_tps(sess):
+    """会话平均生成速度(output tokens/s):累计 output ÷ 活跃时长(首条→末条记录)。
+    常驻口径:只要会话有过 2 条以上 usage.record 就一直显示,不随空闲隐藏。
+    只计 output:input/cacheRead 是每轮重发的上下文,不是吞吐(v1.3.0 曾误计入
+    并除以固定窗口,真机误显 5.9K/s,真实生成速度仅几十/s)。不足 2 条记录返回 0。"""
+    out, t0, t1 = sess.get('out', 0), sess.get('t0'), sess.get('t1')
+    if not out or not t0 or not t1 or t1 <= t0:
         return 0.0
-    hits = glob.glob(os.path.join(SESSIONS, '*', session_id, 'agents', 'main', 'wire.jsonl'))
-    if not hits:
-        return 0.0
-    now = time.time()
-    cutoff = now - window_s
-    tokens = 0.0
-    blocks = 0
-    try:
-        size = os.path.getsize(hits[0])
-        with open(hits[0], 'rb') as f:
-            end = size
-            while end > 0 and blocks < 4:
-                start = max(0, end - TAIL_BYTES)
-                f.seek(start)
-                lines = f.read(end - start).splitlines()
-                if start > 0 and lines:
-                    lines = lines[1:]  # 块首可能是半行,丢弃
-                blocks += 1
-                crossed = False
-                for line in reversed(lines):
-                    if b'usage.record' not in line:
-                        continue
-                    try:
-                        r = json.loads(line)
-                    except ValueError:
-                        continue
-                    if r.get('time', 0) / 1000 < cutoff:
-                        crossed = True
-                        break  # 时间序:本块更早的记录只会更老
-                    u = r.get('usage', {})
-                    tokens += (u.get('inputOther', 0) + u.get('output', 0)
-                               + u.get('inputCacheRead', 0) + u.get('inputCacheCreation', 0))
-                if crossed:
-                    break
-                end = start
-    except OSError:
-        return 0.0
-    return tokens / window_s
+    return out / ((t1 - t0) / 1000)
 
 
 def pick(d, *keys, default=''):
@@ -442,14 +415,14 @@ def main():
             git = git[:23] + '…'
         line1.append(c(f'⎇ {git}', GREEN))
 
-    # 本会话 token + 金额(按官方定价) + 实时 TPS + 项目目录
+    # 本会话 token + 金额(按官方定价) + 会话平均 TPS + 项目目录
     sess = tokens.get('sess') or {}
     if sid and sess.get('id') == sid:
         seg = c(fmt_tokens(sess.get('tokens', 0)), YELLOW)
         cost = sess.get('cost')
         if cost is not None:
             seg += ' ' + c(f'¥{cost:.2f}', YELLOW, BOLD)
-        tps = tps_window(sid)
+        tps = session_tps(sess)
         if tps > 0:
             tps_txt = f'{tps:.1f}' if tps < 100 else fmt_tokens(int(tps))
             seg += ' ' + c(f'{tps_txt}/s', MAGENTA)
