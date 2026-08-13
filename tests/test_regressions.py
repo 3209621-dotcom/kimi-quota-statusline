@@ -145,6 +145,36 @@ check('session_tps:不足 2 条记录(t0==t1)返回 0',
       statusline.session_tps({'out': 500, 't0': 1000, 't1': 1000}) == 0.0)
 check('session_tps:空 sess/缺字段返回 0', statusline.session_tps({}) == 0.0)
 
+
+# ---- live_tps:最近 3 次「llm.request→usage.record」配对的 output÷耗时均值 ----
+def req_t(t_ms):
+    return json.dumps({'type': 'llm.request', 'time': t_ms})
+
+
+def wire_pairs(pairs):
+    """pairs: [(req_offset_ms, dur_ms, out), ...] 时间序 → 写入 wire.jsonl"""
+    with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
+        for off, dur, out in pairs:
+            f.write(req_t(now_ms + off) + '\n')
+            f.write(rec_t(now_ms + off + dur, out) + '\n')
+
+
+wire_pairs([(-100000, 10000, 300),   # 30/s(最老,超出 pair_n=3 时不计入)
+            (-80000, 10000, 400),    # 40/s
+            (-60000, 10000, 500),    # 50/s
+            (-40000, 10000, 600)])   # 60/s
+# 最近 3 对均值 = (40+50+60)/3 = 50;最老的 30/s 不计
+check('live_tps:最近 3 次配对均值=(40+50+60)/3', statusline.live_tps(sid_t) == 50.0)
+check('live_tps:未知会话返回 0', statusline.live_tps('sess_none') == 0.0)
+check('live_tps:空 sessionId 返回 0', statusline.live_tps('') == 0.0)
+# 只有请求没有 usage.record(在途/取消):无配对返回 0
+with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
+    f.write(req_t(now_ms - 1000) + '\n')
+check('live_tps:只有在途请求返回 0', statusline.live_tps(sid_t) == 0.0)
+# 耗时 >600s 的配对不合理(请求与记录错配),丢弃
+wire_pairs([(-700000, 601000, 9999), (-10000, 5000, 200)])  # 40/s 生效
+check('live_tps:耗时>600s 的错配丢弃', statusline.live_tps(sid_t) == 40.0)
+
 # ---- Windows 适配(v1.2.0):detached 参数 / stdin UTF-8 / 跨平台安装器 ----
 # A. detached 刷新进程的 Popen 参数按平台分支(Windows 用 DETACHED_PROCESS 防闪控制台窗口)
 dk = statusline._detached_kwargs('posix') if hasattr(statusline, '_detached_kwargs') else None

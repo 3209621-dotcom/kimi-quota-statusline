@@ -8,7 +8,7 @@ stdin 收到 CLI 的 JSON 快照,stdout 替换底部状态栏(支持两行)。
 - 5h/7d 额度:仅官方 /usages 接口;过期压暗加 ~ 标记,从未拉到则不显示
   (本地 token 折算与官方窗口非线性、校准持续漂移,已于 v1.1.2 移除)
 - 本会话 token/金额:仅当前会话 wire.jsonl 的 usage.record 聚合
-- TPS:会话平均生成速度——累计 output ÷ 活跃时长(首条→末条 usage.record),常驻显示
+- TPS:实时生成速度——最近 3 次「llm.request→usage.record」配对的 output÷耗时均值,空闲保留最后值;老会话配对跌出尾部窗口时回退会话平均
 - 思考强度/swarm:当前会话 wire.jsonl 自尾向前分块重建(swarm 取全文件最近一条记录)
 - ANSI 彩色;KIMI_SL_NOCOLOR=1 回退纯文本
 """
@@ -315,13 +315,72 @@ def session_state(session_id):
 
 def session_tps(sess):
     """会话平均生成速度(output tokens/s):累计 output ÷ 活跃时长(首条→末条记录)。
-    常驻口径:只要会话有过 2 条以上 usage.record 就一直显示,不随空闲隐藏。
     只计 output:input/cacheRead 是每轮重发的上下文,不是吞吐(v1.3.0 曾误计入
-    并除以固定窗口,真机误显 5.9K/s,真实生成速度仅几十/s)。不足 2 条记录返回 0。"""
+    并除以固定窗口,真机误显 5.9K/s,真实生成速度仅几十/s)。不足 2 条记录返回 0。
+    现作 live_tps 的兜底(老会话最近一次配对跌出尾部扫描窗口时用)。"""
     out, t0, t1 = sess.get('out', 0), sess.get('t0'), sess.get('t1')
     if not out or not t0 or not t1 or t1 <= t0:
         return 0.0
     return out / ((t1 - t0) / 1000)
+
+
+def live_tps(session_id, max_blocks=4, pair_n=3):
+    """实时生成速度(output tokens/s):最近 pair_n 次「llm.request → usage.record」
+    配对的均值。单次耗时含排队/思考/生成,即用户体感速度——这是 wire.jsonl 无
+    逐条生成耗时字段下最诚实的实时口径(业界 statusline 多用 tokens/min 燃烧率
+    或会话平均,都不是实时)。自尾部向前分块扫,凑够 pair_n 对即停;
+    配对 sanity:耗时 ≤600s;无配对返回 0。"""
+    if not session_id:
+        return 0.0
+    hits = glob.glob(os.path.join(SESSIONS, '*', session_id, 'agents', 'main', 'wire.jsonl'))
+    if not hits:
+        return 0.0
+    reqs, recs = [], []
+    try:
+        size = os.path.getsize(hits[0])
+        with open(hits[0], 'rb') as f:
+            end = size
+            blocks = 0
+            while end > 0 and blocks < max_blocks:
+                start = max(0, end - TAIL_BYTES)
+                f.seek(start)
+                lines = f.read(end - start).splitlines()
+                if start > 0 and lines:
+                    lines = lines[1:]  # 块首可能是半行,丢弃
+                blocks += 1
+                for line in lines:
+                    if b'llm.request' in line:
+                        try:
+                            t = json.loads(line).get('time', 0)
+                        except ValueError:
+                            continue
+                        if t:
+                            reqs.append(t)
+                    elif b'usage.record' in line:
+                        try:
+                            r = json.loads(line)
+                        except ValueError:
+                            continue
+                        if r.get('type') == 'usage.record' and r.get('time'):
+                            recs.append((r['time'], r.get('usage', {}).get('output', 0)))
+                if len(recs) >= pair_n and len(reqs) >= pair_n or start == 0:
+                    break
+                end = start
+    except OSError:
+        return 0.0
+    import bisect
+    reqs.sort()
+    speeds = []
+    for t, out in sorted(recs, reverse=True):  # 新的优先
+        i = bisect.bisect_right(reqs, t) - 1
+        if i < 0:
+            continue
+        dur = (t - reqs[i]) / 1000
+        if 0 < dur <= 600 and out > 0:
+            speeds.append(out / dur)
+        if len(speeds) >= pair_n:
+            break
+    return sum(speeds) / len(speeds) if speeds else 0.0
 
 
 def pick(d, *keys, default=''):
@@ -415,14 +474,14 @@ def main():
             git = git[:23] + '…'
         line1.append(c(f'⎇ {git}', GREEN))
 
-    # 本会话 token + 金额(按官方定价) + 会话平均 TPS + 项目目录
+    # 本会话 token + 金额(按官方定价) + 实时 TPS(最近几次请求均值,空闲保留最后值) + 项目目录
     sess = tokens.get('sess') or {}
     if sid and sess.get('id') == sid:
         seg = c(fmt_tokens(sess.get('tokens', 0)), YELLOW)
         cost = sess.get('cost')
         if cost is not None:
             seg += ' ' + c(f'¥{cost:.2f}', YELLOW, BOLD)
-        tps = session_tps(sess)
+        tps = live_tps(sid) or session_tps(sess)
         if tps > 0:
             tps_txt = f'{tps:.1f}' if tps < 100 else fmt_tokens(int(tps))
             seg += ' ' + c(f'{tps_txt}T/s', MAGENTA)
