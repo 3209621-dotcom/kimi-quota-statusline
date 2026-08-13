@@ -99,6 +99,99 @@ check('同块 [enter, exit]:不显示 swarm', statusline.session_state(sid)[1] i
 sid, _ = make_wire(10, [enter, exit_, enter])
 check('同块 [enter, exit, enter]:显示 swarm', statusline.session_state(sid)[1] is True)
 
+# ---- Windows 适配(v1.2.0):detached 参数 / stdin UTF-8 / 跨平台安装器 ----
+# A. detached 刷新进程的 Popen 参数按平台分支(Windows 用 DETACHED_PROCESS 防闪控制台窗口)
+dk = statusline._detached_kwargs('posix') if hasattr(statusline, '_detached_kwargs') else None
+check('posix:detached 用 start_new_session', dk == {'start_new_session': True})
+dk = statusline._detached_kwargs('nt') if hasattr(statusline, '_detached_kwargs') else None
+check('nt:detached 用 creationflags(DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP),无 start_new_session',
+      isinstance(dk, dict) and 'start_new_session' not in dk
+      and (dk.get('creationflags', 0) & 0x8) != 0 and (dk.get('creationflags', 0) & 0x200) != 0)
+
+
+def render_bytes(stdin_bytes, cache_obj):
+    """stdin 文本层故意用 ascii(模拟 Windows 非 UTF-8 locale):直接 .read() 必炸,正解是读 .buffer 按 UTF-8 解。"""
+    fd, path = tempfile.mkstemp(suffix='.json')
+    with os.fdopen(fd, 'w') as f:
+        json.dump(cache_obj, f)
+    old_cache, old_stdin, old_dbg = statusline.CACHE, sys.stdin, statusline.DEBUG_STDIN
+    dbg = os.path.join(tempfile.mkdtemp(), 'stdin.json')
+    statusline.CACHE, statusline.DEBUG_STDIN = path, dbg
+    sys.stdin = io.TextIOWrapper(io.BytesIO(stdin_bytes), encoding='ascii')
+    buf = io.StringIO()
+    try:
+        with redirect_stdout(buf):
+            statusline.main()
+    except Exception:
+        pass
+    finally:
+        statusline.CACHE, statusline.DEBUG_STDIN = old_cache, old_dbg
+        sys.stdin = old_stdin
+        os.unlink(path)
+    return buf.getvalue()
+
+
+# B. stdin 文本层编码错误时仍按 UTF-8 解析;debug 快照写入也不得炸(中文路径)
+snap_bytes = json.dumps({'sessionId': '', 'version': 't', 'cwd': 'D:/用户/项目'},
+                        ensure_ascii=False).encode('utf-8')
+out = render_bytes(snap_bytes, {'ts': now})
+check('stdin 编码错误 locale:UTF-8 中文目录名正常显示', '项目' in out)
+
+# C. 跨平台安装器 install.py / uninstall.py
+try:
+    import install as _inst
+    import uninstall as _uninst
+except ImportError:
+    _inst = _uninst = None
+check('install.py / uninstall.py 可导入', _inst is not None and _uninst is not None)
+
+if _inst:
+    line_posix = _inst.build_command('/p/kimi-quota-statusline/statusline.py', os_name='posix')
+    check('posix 命令行:python3 + 路径',
+          line_posix == 'command = "python3 /p/kimi-quota-statusline/statusline.py"')
+    line_nt = _inst.build_command('C:\\p\\kimi-quota-statusline\\statusline.py',
+                                  os_name='nt', executable='C:\\Py\\python.exe')
+    check('nt 命令行:解释器绝对路径 + TOML 转义',
+          line_nt == 'command = "\\"C:\\\\Py\\\\python.exe\\" \\"C:\\\\p\\\\kimi-quota-statusline\\\\statusline.py\\""')
+
+    # posix 安装 → 幂等 → 卸载往返
+    home = tempfile.mkdtemp()
+    tui = os.path.join(home, 'tui.toml')
+    target = os.path.join(home, 'plugins', 'kimi-quota-statusline', 'statusline.py')
+    os.makedirs(os.path.dirname(target))
+    open(target, 'w').close()
+    rc = _inst.install(tui, target, doctor=False)
+    text = open(tui, encoding='utf-8').read()
+    check('安装:写入 [status_line] 且 command 指向插件',
+          rc == 0 and '[status_line]' in text and 'statusline.py' in text)
+    _inst.install(tui, target, doctor=False)
+    check('安装幂等:内容不变', open(tui, encoding='utf-8').read() == text)
+    rc = _uninst.uninstall(tui, os.path.dirname(target), doctor=False)
+    text = open(tui, encoding='utf-8').read()
+    check('卸载:command 与空 section 一并移除',
+          rc == 0 and 'statusline.py' not in text and '[status_line]' not in text)
+    check('卸载生成 .bak 备份', any(f.endswith('.bak') for f in os.listdir(home)))
+
+    # 覆盖已有 command:其他 section 不受影响
+    home2 = tempfile.mkdtemp()
+    tui2 = os.path.join(home2, 'tui.toml')
+    open(tui2, 'w', encoding='utf-8').write('[status_line]\ncommand = "python3 /other/x.py"\n\n[editor]\n')
+    _inst.install(tui2, os.path.join(home2, 'statusline.py'), doctor=False)
+    text = open(tui2, encoding='utf-8').read()
+    check('覆盖已有 command:其他 section 保留',
+          'statusline.py' in text and '/other/x.py' not in text and '[editor]' in text)
+
+    # Windows 形态:转义路径写入,卸载也能认出
+    home3 = tempfile.mkdtemp()
+    tui3 = os.path.join(home3, 'tui.toml')
+    tgt3 = 'C:\\kc\\plugins\\kimi-quota-statusline\\statusline.py'
+    _inst.install(tui3, tgt3, os_name='nt', executable='C:\\Py\\python.exe', doctor=False)
+    check('nt 安装:命令行含转义反斜杠',
+          '\\\\' in open(tui3, encoding='utf-8').read().split('command')[1])
+    rc = _uninst.uninstall(tui3, 'C:\\kc\\plugins\\kimi-quota-statusline', doctor=False)
+    check('nt 卸载:转义路径同样识别并移除',
+          rc == 0 and 'statusline.py' not in open(tui3, encoding='utf-8').read())
+
 print()
 if FAILED:
     print(f'{len(FAILED)} 个用例失败')

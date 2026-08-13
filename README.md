@@ -55,16 +55,16 @@ Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密
 
 ```bash
 git clone https://github.com/3209621-dotcom/kimi-quota-statusline.git
-bash kimi-quota-statusline/install.sh   # 自动备份 tui.toml、写入 [status_line].command、kimi doctor 校验
-# 然后在 TUI 运行 /reload-tui
+python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusline\install.py
+# 自动备份 tui.toml、写入 [status_line].command、kimi doctor 校验;然后在 TUI 运行 /reload-tui
 ```
 
-要求：Kimi Code CLI ≥ 0.30.0(`[status_line]` 特性），Python 3,macOS / Linux。
+要求：Kimi Code CLI ≥ 0.30.0(`[status_line]` 特性），Python 3,macOS / Linux / Windows。
 
 ## 卸载
 
 ```
-/kimi-quota-statusline:uninstall   # 或手动 bash uninstall.sh
+/kimi-quota-statusline:uninstall   # 或手动:python3 uninstall.py(Windows: python uninstall.py)
 ```
 
 恢复官方默认状态栏。
@@ -130,16 +130,16 @@ Or manually:
 
 ```bash
 git clone https://github.com/3209621-dotcom/kimi-quota-statusline.git
-bash kimi-quota-statusline/install.sh   # backs up tui.toml, writes [status_line].command, validates with kimi doctor
-# then run /reload-tui in the TUI
+python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusline\install.py
+# backs up tui.toml, writes [status_line].command, validates with kimi doctor; then run /reload-tui in the TUI
 ```
 
-Requirements: Kimi Code CLI ≥ 0.30.0 (the `[status_line]` feature), Python 3, macOS / Linux.
+Requirements: Kimi Code CLI ≥ 0.30.0 (the `[status_line]` feature), Python 3, macOS / Linux / Windows.
 
 ## Uninstall
 
 ```
-/kimi-quota-statusline:uninstall    # or: bash uninstall.sh
+/kimi-quota-statusline:uninstall    # or: python3 uninstall.py (Windows: python uninstall.py)
 ```
 
 Restores the built-in footer layout.

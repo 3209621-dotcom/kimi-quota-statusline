@@ -4,9 +4,13 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-13
+
 ### Added
-- 安装完成后的一次性 Star 提示(install.sh 输出 + install 斜杠命令告知,只提一次)
-- README 顶部 GitHub 星数徽章(shields.io)
+- Windows 支持:后台刷新进程按平台分支(Windows 用 `DETACHED_PROCESS`,不再闪控制台窗口);stdin 快照与 debug 写入强制 UTF-8(非 UTF-8 locale 下中文路径不再崩溃);跨平台安装器 `install.py` / `uninstall.py`(`install.sh` / `uninstall.sh` 保留为兼容壳)
+- 三平台 CI(`.github/workflows/ci.yml`):windows / ubuntu / macos 跑回归测试 + 中文路径冒烟渲染 + 安装/卸载往返
+- README 顶部居中 hero 横幅(`assets/hero.svg`:品牌蓝渐变大标题 + 打字机轮换标语)+ 徽章行
+- 安装完成后的一次性 Star 提示(安装器输出 + install 斜杠命令告知,只提一次)
 - README 演示素材:状态栏静态截图 + swarm 水波动效 GIF(`assets/`,附生成器 make_demo.py)
 
 ## [1.1.2] - 2026-08-09

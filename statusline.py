@@ -198,6 +198,16 @@ def refresh_cache(session_id='', ver=''):
         pass
 
 
+def _detached_kwargs(os_name=os.name):
+    """后台刷新进程的 Popen 平台参数:POSIX 脱离会话;Windows 用 DETACHED_PROCESS,
+    否则每次刷新都会闪一个控制台窗口(常量值即 Win32 API 值,POSIX 的 subprocess
+    没有这两个属性,故用字面量)。"""
+    if os_name == 'nt':
+        # DETACHED_PROCESS(0x8) | CREATE_NEW_PROCESS_GROUP(0x200)
+        return {'creationflags': 0x00000008 | 0x00000200}
+    return {'start_new_session': True}
+
+
 def load_tokens(session_id='', ver=''):
     """读缓存;过期则 detached 刷新(带上 sessionId 统计本会话消耗、ver 作 UA),当前用旧值先显示。"""
     try:
@@ -210,8 +220,8 @@ def load_tokens(session_id='', ver=''):
             if not os.path.exists(LOCK) or time.time() - os.stat(LOCK).st_mtime > LOCK_S:
                 open(LOCK, 'w').close()
                 subprocess.Popen([sys.executable, os.path.abspath(__file__), '--refresh', session_id, ver],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, **_detached_kwargs())
         except OSError:
             pass
     return cache or {}
@@ -303,16 +313,21 @@ def pick(d, *keys, default=''):
 
 
 def main():
-    raw = sys.stdin.read()
+    # Windows 控制台 stdin 文本层可能是 GBK/cp1252,直接 .read() 遇到中文快照会炸;
+    # 绕过文本层读原始字节按 UTF-8 解(无 .buffer 的测试替身走原路径)
+    if hasattr(sys.stdin, 'buffer'):
+        raw = sys.stdin.buffer.read().decode('utf-8', 'replace')
+    else:
+        raw = sys.stdin.read()
     snap = {}
     try:
         snap = json.loads(raw) if raw.strip() else {}
     except ValueError:
         pass
     try:
-        with open(DEBUG_STDIN, 'w') as f:
+        with open(DEBUG_STDIN, 'w', encoding='utf-8', errors='replace') as f:
             f.write(raw[:4096])
-    except OSError:
+    except Exception:
         pass
 
     sid = pick(snap, 'sessionId', 'session_id')

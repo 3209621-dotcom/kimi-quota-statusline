@@ -18,11 +18,12 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 |---|---|
 | `statusline.py` | 状态栏本体(全部逻辑) |
 | `kimi.plugin.json` | 插件清单(name/version/interface/commands);**发布时记得升 version** |
-| `install.sh` / `uninstall.sh` | 幂等安装器:备份 tui.toml → 写入/移除 `[status_line].command` → `kimi doctor tui` 校验 |
+| `install.py` / `uninstall.py` | 跨平台幂等安装器:备份 tui.toml → 写入/移除 `[status_line].command` → `kimi doctor tui` 校验;`install.sh` / `uninstall.sh` 仅为 macOS/Linux 兼容壳(一行 exec 调 .py) |
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
-| `tests/test_regressions.py` | 回归测试(无框架):额度口径 4 例 + swarm 分块扫描 5 例,`python3 tests/test_regressions.py` |
+| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdin UTF-8、安装器)共 22 例,`python3 tests/test_regressions.py` |
+| `.github/workflows/ci.yml` | 三平台 CI(windows / ubuntu / macos):回归 + 中文路径冒烟渲染 + 安装/卸载往返 |
 | `assets/` | `hero.svg`(README 顶部横幅:手写 SVG + SMIL 动画,品牌蓝渐变标题 + 三句打字机标语,改文案直接编辑;本地预览用 Chrome headless 截图)+ 演示素材 `statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
 | `docs/MAINTAINING.md` | 本文档 |
 
@@ -66,7 +67,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 
 ## 六、发布流程
 
-1. 改代码 + 本地测试(上面清单 + `python3 tests/test_regressions.py` 回归测试)。
+1. 改代码 + 本地测试(上面清单 + `python3 tests/test_regressions.py` 回归测试);push 后确认三平台 CI 绿再发版。
 2. 双语 README 同步;`CHANGELOG.md` 记录;`kimi.plugin.json` 的 `version` 升号。
 3. `git add -A && git commit && git push`(origin = GitHub 仓库)。
 4. 大版本可打 tag:`git tag v1.x.0 && git push --tags`。
@@ -90,6 +91,7 @@ Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通�
 - `[status_line].command` 只接管底部**第一行**;第二行(原生 context 读数)是 `footer.ts` 写死的,关不掉,所以本插件不显示 ctx 条(避免重复)。
 - 不要把耗时操作放进主流程(300ms 超时会被 SIGKILL,整行回退内置布局)——重活一律走 detached refresh。
 - 多行输出无效:只有 stdout 第一行会被渲染。
+- Windows:后台刷新 Popen 必须用 `DETACHED_PROCESS`(否则闪控制台窗口),POSIX 才用 `start_new_session`;stdin 快照走 `sys.stdin.buffer` 按 UTF-8 解(控制台文本层可能是 GBK/cp1252);tui.toml 里 Windows 路径反斜杠按 TOML 双写转义,卸载匹配前先归一化(分隔符跟随写入平台,别用 `os.path.join` 拼路径来比对)。
 
 ## 九、路线图(想法池)
 

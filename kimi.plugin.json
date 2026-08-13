@@ -1,14 +1,14 @@
 {
   "name": "kimi-quota-statusline",
-  "version": "1.1.2",
-  "description": "Kimi Code 底部状态栏增强:权限模式 / 模型·思考强度 / swarm 特效 / 5h·7d 官方额度条 / 今日 token 与金额 / git·目录",
+  "version": "1.2.0",
+  "description": "Kimi Code 底部状态栏增强:权限模式 / 模型·思考强度 / swarm 特效 / 5h·7d 官方额度条 / 会话 token 与金额 / git·目录",
   "keywords": ["statusline", "quota", "usage", "status-bar"],
   "author": "guo",
   "license": "MIT",
   "interface": {
     "displayName": "Kimi Quota Statusline",
     "shortDescription": "官方额度 + token 消耗的彩色底部状态栏",
-    "longDescription": "替换 Kimi Code 底部第一行状态栏:显示权限模式、模型与思考强度、swarm 模式特效(整行边框+反色高亮)、5h/7d 官方额度进度条(直连官方 /usages 接口,与 /usage 同源)、今日 token 消耗与按官方定价估算的金额、git 分支与项目目录。"
+    "longDescription": "替换 Kimi Code 底部第一行状态栏:显示权限模式、模型与思考强度、swarm 模式特效(整行边框+反色高亮)、5h/7d 官方额度进度条(直连官方 /usages 接口,与 /usage 同源)、本会话 token 消耗与按官方定价估算的金额、git 分支与项目目录。"
   },
   "commands": "./commands/"
 }
