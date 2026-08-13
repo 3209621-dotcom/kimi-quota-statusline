@@ -329,7 +329,9 @@ def live_tps(session_id, max_blocks=4, pair_n=3):
     配对的均值。单次耗时含排队/思考/生成,即用户体感速度——这是 wire.jsonl 无
     逐条生成耗时字段下最诚实的实时口径(业界 statusline 多用 tokens/min 燃烧率
     或会话平均,都不是实时)。自尾部向前分块扫,凑够 pair_n 对即停;
-    配对 sanity:耗时 ≤600s;无配对返回 0。"""
+    配对 sanity:耗时 ≤600s;无配对返回 0。
+    已知取舍:块边界记录可能双侧各丢半条(新块丢首部半行、旧块尾部半行解析
+    失败),每次扫描最多丢几条,对 TPS 估值影响可忽略。"""
     if not session_id:
         return 0.0
     hits = glob.glob(os.path.join(SESSIONS, '*', session_id, 'agents', 'main', 'wire.jsonl'))
@@ -351,9 +353,14 @@ def live_tps(session_id, max_blocks=4, pair_n=3):
                 for line in lines:
                     if b'llm.request' in line:
                         try:
-                            t = json.loads(line).get('time', 0)
+                            r = json.loads(line)
                         except ValueError:
                             continue
+                        # type 校验不可省:payload 文本可能含 "llm.request" 子串,
+                        # 幻影请求点会压短耗时、抬高 TPS(正是要消灭的误显方向)
+                        if r.get('type') != 'llm.request':
+                            continue
+                        t = r.get('time', 0)
                         if t:
                             reqs.append(t)
                     elif b'usage.record' in line:
@@ -363,7 +370,7 @@ def live_tps(session_id, max_blocks=4, pair_n=3):
                             continue
                         if r.get('type') == 'usage.record' and r.get('time'):
                             recs.append((r['time'], r.get('usage', {}).get('output', 0)))
-                if len(recs) >= pair_n and len(reqs) >= pair_n or start == 0:
+                if (len(recs) >= pair_n and len(reqs) >= pair_n) or start == 0:
                     break
                 end = start
     except OSError:

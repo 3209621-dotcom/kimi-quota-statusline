@@ -174,6 +174,40 @@ check('live_tps:只有在途请求返回 0', statusline.live_tps(sid_t) == 0.0)
 # 耗时 >600s 的配对不合理(请求与记录错配),丢弃
 wire_pairs([(-700000, 601000, 9999), (-10000, 5000, 200)])  # 40/s 生效
 check('live_tps:耗时>600s 的错配丢弃', statusline.live_tps(sid_t) == 40.0)
+# 只有 usage.record 没有 llm.request:扫满 4 块也无配对,返回 0
+with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
+    f.write(rec_t(now_ms - 1000, 500) + '\n')
+check('live_tps:只有 usage.record 返回 0', statusline.live_tps(sid_t) == 0.0)
+
+
+# 分块扫描机制:配对垫出尾部 512K 仍能凑够;超过 4 块(2MB)上限优雅截断
+def build_wire_padded(tail_lines, pad_kb, head_lines=None):
+    p = os.path.join(d_t, 'wire.jsonl')
+    pad = json.dumps({'type': 'noise', 'pad': 'x' * 1000}) + '\n'
+    with open(p, 'w') as f:
+        for l in (head_lines or []):
+            f.write(l + '\n')
+        base = f.tell()
+        while f.tell() < base + pad_kb * 1024:
+            f.write(pad)
+        for l in tail_lines:
+            f.write(l + '\n')
+
+
+# 最老一对(30/s)被 600K 噪声垫出尾部块,须翻块才能凑够 3 对
+build_wire_padded(
+    [req_t(now_ms - 20000), rec_t(now_ms - 15000, 250),   # 50/s
+     req_t(now_ms - 10000), rec_t(now_ms, 400)],          # 40/s
+    600,
+    head_lines=[req_t(now_ms - 100000), rec_t(now_ms - 90000, 300)])  # 30/s
+check('live_tps:配对跌出尾部 512K 翻块凑够 3 对(40+50+30)/3',
+      statusline.live_tps(sid_t) == 40.0)
+# 可及范围内只有 1 对(更早的在 2.5MB 之外,超 4 块上限):返回少对均值而非错值
+build_wire_padded(
+    [req_t(now_ms - 10000), rec_t(now_ms, 400)],          # 40/s
+    2500,
+    head_lines=[req_t(now_ms - 100000), rec_t(now_ms - 90000, 9999)])
+check('live_tps:超 4 块上限优雅截断(仅 1 对=40/s)', statusline.live_tps(sid_t) == 40.0)
 
 # ---- Windows 适配(v1.2.0):detached 参数 / stdin UTF-8 / 跨平台安装器 ----
 # A. detached 刷新进程的 Popen 参数按平台分支(Windows 用 DETACHED_PROCESS 防闪控制台窗口)
