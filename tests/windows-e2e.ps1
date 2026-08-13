@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 Windows 真机端到端验收(自动项 + 手动项)。CI 的 windows job 也会跑自动项。
 
@@ -43,8 +43,11 @@ const input = JSON.parse(require('fs').readFileSync(0, 'utf8'));
 const t0 = Date.now();
 let child;
 try {
-  child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', input.command], {
+  // windowsVerbatimArguments + 整条命令再包一层引号:node 默认 quoting 会把内嵌引号
+  // 转成 \" 喂给 cmd,cmd 不认反斜杠转义;verbatim+外包引号与本机 kimi.exe 实跑行为一致
+  child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', '"' + input.command + '"'], {
     stdio: ['pipe', 'pipe', 'pipe'],
+    windowsVerbatimArguments: true,
   });
 } catch (e) {
   console.log(JSON.stringify({ code: 'spawn-error', err: String(e) }));
@@ -167,16 +170,10 @@ if (-not $okB) {
     if ($null -ne $rB) { Write-Host ('  code=' + $rB.code + ' out=' + $rB.out + ' err=' + $rB.err) }
 }
 
-# 实验项(不计成败,只为定位修复方向):cmd 文档推荐的"双外层引号"形态是否更稳
-$rB2 = Invoke-Probe ('""' + $py + '" "' + $stressScript + '""') $payloadCN
-if ($null -ne $rB2) {
-    Write-Host ('[实验] cmd 文档形态 ""..."" : code=' + $rB2.code + ' out=' + $rB2.out + ' err=' + $rB2.err)
-}
-
 # ---------- C. detached 刷新:不闪窗 + 缓存落盘 ----------
 
 $sid = 'e2e_test_session'
-$wireDir = Join-Path $env:USERPROFILE 'kimi-code\sessions\wd_e2e\' + $sid + '\agents\main'
+$wireDir = Join-Path $env:USERPROFILE ('.kimi-code\sessions\wd_e2e\' + $sid + '\agents\main')
 New-Item -ItemType Directory -Force -Path $wireDir | Out-Null
 $line = '{"type":"usage.record","usage":{"inputOther":1,"output":0,"inputCacheRead":0,"inputCacheCreation":0},"time":1}'
 $chunk = ([string]::Join("`r`n", (1..5000 | ForEach-Object { $line })) + "`r`n")
@@ -206,7 +203,7 @@ if ($null -ne $found) {
     Write-Host '  未抓到 --refresh 子进程(可能秒退);缓存断言仍会兜底判定'
 }
 
-$cache = Join-Path $env:USERPROFILE 'kimi-code\statusline-tokens.json'
+$cache = Join-Path $env:USERPROFILE '.kimi-code\statusline-tokens.json'
 $cacheOk = $false
 for ($i = 0; $i -lt 60 -and -not $cacheOk; $i++) {
     Start-Sleep -Milliseconds 500
@@ -219,7 +216,7 @@ for ($i = 0; $i -lt 60 -and -not $cacheOk; $i++) {
 }
 Check 'C 刷新进程完成:缓存落盘且会话 token=200000' $cacheOk
 
-$lock = Join-Path $env:USERPROFILE 'kimi-code\statusline-refresh.lock'
+$lock = Join-Path $env:USERPROFILE '.kimi-code\statusline-refresh.lock'
 Start-Sleep -Seconds 2
 Check 'C 刷新锁回收(LOCK 文件删除)' (-not (Test-Path $lock))
 

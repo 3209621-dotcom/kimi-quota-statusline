@@ -21,13 +21,27 @@ def _write_atomic(path, text):
     os.replace(tmp, path)
 
 
+# cmd /c 下的元字符:含任一字符(或空格)就必须加引号
+_CMD_UNSAFE = set(' &|<>^()%"!')
+
+
+def _cmd_needs_quotes(s):
+    return any(ch in _CMD_UNSAFE for ch in s)
+
+
 def build_command(target, os_name=None, executable=None):
     """生成 tui.toml 里的 command 行。
-    posix 沿用 `python3 <路径>`;Windows 用解释器绝对路径,反斜杠按 TOML 规则双写转义。"""
+    posix 沿用 `python3 <路径>`;Windows 用解释器绝对路径,反斜杠按 TOML 规则双写转义。
+    Windows 路径不含空格/cmd 元字符时不加引号:TUI spawn cmd.exe 的引号形态各版本不一
+    (libuv 默认 quoting 会把内嵌引号转成 \\" 喂给 cmd,cmd 不认反斜杠转义,命令直接
+    失败回退内置布局),裸命令在所有已知 spawn 形态下都能跑;含元字符才退回引号形态。"""
     os_name = os_name or os.name
     if os_name == 'nt':
-        exe = (executable or sys.executable).replace('\\', '\\\\')
+        raw_exe = executable or sys.executable
+        exe = raw_exe.replace('\\', '\\\\')
         tgt = target.replace('\\', '\\\\')
+        if not _cmd_needs_quotes(raw_exe) and not _cmd_needs_quotes(target):
+            return f'command = "{exe} {tgt}"'
         return f'command = "\\"{exe}\\" \\"{tgt}\\""'
     return f'command = "python3 {target}"'
 
@@ -73,7 +87,8 @@ def install(tui, target, os_name=None, executable=None, doctor=True):
         def repl(m):
             body = m.group(0)
             if re.search(r'(?m)^command\s*=', body):
-                return re.sub(r'(?m)^command\s*=.*$', cmd_line, body, count=1)
+                # 替换串走 lambda:re.sub 会把 cmd_line 里 Windows 路径的 \\ 当转义吃掉
+                return re.sub(r'(?m)^command\s*=.*$', lambda _: cmd_line, body, count=1)
             return body.rstrip('\n') + '\n' + cmd_line + '\n'
         text = re.sub(SECTION_RE, repl, text)
     else:

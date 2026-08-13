@@ -179,8 +179,8 @@ if _inst:
           line_posix == 'command = "python3 /p/kimi-quota-statusline/statusline.py"')
     line_nt = _inst.build_command('C:\\p\\kimi-quota-statusline\\statusline.py',
                                   os_name='nt', executable='C:\\Py\\python.exe')
-    check('nt 命令行:解释器绝对路径 + TOML 转义',
-          line_nt == 'command = "\\"C:\\\\Py\\\\python.exe\\" \\"C:\\\\p\\\\kimi-quota-statusline\\\\statusline.py\\""')
+    check('nt 命令行(无空格/元字符):解释器绝对路径 + TOML 转义,不加引号',
+          line_nt == 'command = "C:\\\\Py\\\\python.exe C:\\\\p\\\\kimi-quota-statusline\\\\statusline.py"')
 
     # posix 安装 → 幂等 → 卸载往返
     home = tempfile.mkdtemp()
@@ -219,6 +219,25 @@ if _inst:
     rc = _uninst.uninstall(tui3, 'C:\\kc\\plugins\\kimi-quota-statusline', doctor=False)
     check('nt 卸载:转义路径同样识别并移除',
           rc == 0 and 'statusline.py' not in open(tui3, encoding='utf-8').read())
+
+    # 覆盖已有 command 时走 re.sub 替换路径:Windows 路径的 \\ 不得被替换串转义规则吃掉
+    # (2026-08-13 真机事故:re.sub 把 cmd_line 的 \\ 当转义,tui.toml 写成非法 TOML)
+    home9 = tempfile.mkdtemp()
+    tui9 = os.path.join(home9, 'tui.toml')
+    open(tui9, 'w', encoding='utf-8').write('[status_line]\ncommand = "old"\n')
+    tgt9 = 'C:\\kc\\plugins\\kimi-quota-statusline\\statusline.py'
+    _inst.install(tui9, tgt9, os_name='nt', executable='C:\\Py\\python.exe', doctor=False)
+    text9 = open(tui9, encoding='utf-8').read()
+    ok9 = '\\\\' in text9  # 双写反斜杠必须活着写进文件
+    try:
+        import tomllib
+        ok9 = ok9 and tomllib.loads(text9)['status_line']['command'] == \
+            f'C:\\Py\\python.exe {tgt9}'
+    except ImportError:
+        pass
+    except Exception:
+        ok9 = False
+    check('nt 覆盖已有 command:写入仍是合法 TOML 且路径还原正确', ok9)
 
     # 卸载不误伤(code review 发现的退化):section 内注释提及插件路径、command 指向
     # 他人脚本时,command 必须保留——卸载是行级精确匹配,不是 section 级宽松匹配
