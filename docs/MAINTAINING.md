@@ -22,7 +22,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
-| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配、doctor OSError 兜底)共 30 例,`python3 tests/test_regressions.py` |
+| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配、doctor OSError 兜底、nt 命令形态)共 32 例,`python3 tests/test_regressions.py` |
 | `tests/windows-e2e.ps1` | Windows 真机验收(PowerShell):真实 Node spawn 复刻 TUI 的 cmd /d /s /c 链路 + 元字符路径压测 + detached 不闪窗 + UTF-8;自动项已入 CI windows job,手动项(真实 TUI 肉眼)见脚本尾部清单 |
 | `.github/workflows/ci.yml` | 三平台 CI(windows / ubuntu / macos):回归 + 中文路径冒烟渲染 + 安装/卸载往返 |
 | `assets/` | `hero.svg`(README 顶部横幅:手写 SVG + SMIL 动画,品牌蓝渐变标题 + 三句打字机标语,改文案直接编辑;本地预览用 Chrome headless 截图)+ 演示素材 `statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
@@ -95,6 +95,9 @@ Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通�
 - Windows:后台刷新 Popen 必须用 `DETACHED_PROCESS`(否则闪控制台窗口),POSIX 才用 `start_new_session`;stdin 快照走 `sys.stdin.buffer` 按 UTF-8 解,stdout 也要 `reconfigure(encoding='utf-8')`(控制台文本层可能是 GBK/cp1252,print 中文直接 UnicodeEncodeError);tui.toml 里 Windows 路径反斜杠按 TOML 双写转义,卸载匹配前先归一化(分隔符跟随写入平台,别用 `os.path.join` 拼路径来比对)。
 - 安装/卸载器对 tui.toml 的匹配一律**行级精确**:只认 command 行的值;注释或其他行提及插件路径不算数(section 级宽松匹配会误删指向他人脚本的 command,v1.2.0 评审发现并修复)。CI windows job 已用真实 Node spawn 复刻 TUI 的 cmd 引号解析 + detached 不闪窗(MainWindowHandle) + 元字符路径压测,但**真实 TUI 渲染**仍需真机肉眼确认。TUI 在 Windows 用 `cmd.exe /d /s /c` 解析 command,带引号路径含 `& ^ ( ) %` 等 cmd 元字符(如 Python 装在 `Program Files (x86)`)是最可能炸的点,`windows-e2e.ps1` 的 B 项专测这条。
 - Windows:kimi 为 npm 安装时是 `kimi.cmd` shim,`subprocess.run(['kimi', ...])` 直接 CreateProcess 会抛 WinError 193(OSError);doctor 校验须 `shell=(os.name == 'nt')` 并经 `except OSError` 兜底只提示不阻断(v1.2.1 修复,回归锁死)。
+- Windows 的 TUI spawn 引号语义(2026-08-13 真机实测,kimi.exe 用 verbatim 参数 + 外包引号):libuv 默认 quoting 会把内嵌引号转成 `\"` 喂给 cmd,cmd 不认反斜杠转义 → 带引号 command 每次失败、TUI 静默回退内置布局。因此 nt 命令**路径不含空格/cmd 元字符时裸写**(所有已知 spawn 形态都能跑),含元字符才退回引号形态(安装器此时打警告);元字符集含 `, ; =`(cmd 也当参数分隔符,`C:\a,b\x` 会被切碎)。
+- `install.py` 覆盖已有 command 时的 `re.sub` 必须用 lambda 替换:替换串里的 Windows `\\` 会被当正则转义吃掉,写出非法 TOML(2026-08-13 真机事故,回归用 tomllib 往返校验锁死)。
+- `tests/windows-e2e.ps1` 必须带 UTF-8 BOM 存盘:PS5.1 对无 BOM 文件按 ANSI 解析,中文注释直接语法错误。
 
 ## 九、路线图(想法池)
 

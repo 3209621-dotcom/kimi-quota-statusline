@@ -286,6 +286,13 @@ if _inst:
           line_mix == 'command = "\\"C:\\\\程序 Files\\\\python.exe\\" '
                       '\\"C:\\\\用户\\\\我的项目\\\\kimi-quota-statusline\\\\statusline.py\\""')
 
+    # cmd 把 , ; = 也当参数分隔符(C:\a,b\x 会被切碎),必须退回引号形态
+    line_sep = _inst.build_command('C:\\a,b\\kimi-quota-statusline\\statusline.py',
+                                   os_name='nt', executable='C:\\Py\\python.exe')
+    check('nt 路径含 , ; = 等 cmd 分隔符:退回引号形态',
+          line_sep == 'command = "\\"C:\\\\Py\\\\python.exe\\" '
+                      '\\"C:\\\\a,b\\\\kimi-quota-statusline\\\\statusline.py\\""')
+
     # Windows 特有坑:kimi 是 npm 生成的 kimi.cmd shim 时 CreateProcess 抛 WinError 193
     # (OSError)——doctor 失败只提示不阻断,配置已写入不得判安装失败(回归锁死)
     home8 = tempfile.mkdtemp()

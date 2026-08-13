@@ -21,8 +21,9 @@ def _write_atomic(path, text):
     os.replace(tmp, path)
 
 
-# cmd /c 下的元字符:含任一字符(或空格)就必须加引号
-_CMD_UNSAFE = set(' &|<>^()%"!')
+# cmd /c 下的元字符:含任一字符(或空格)就必须加引号;`,` `;` `=` 在 cmd 命令解析里
+# 也当参数分隔符(C:\a,b\x 会被切碎),一并列入
+_CMD_UNSAFE = set(' &|<>^()%"!,;=')
 
 
 def _cmd_needs_quotes(s):
@@ -42,6 +43,9 @@ def build_command(target, os_name=None, executable=None):
         tgt = target.replace('\\', '\\\\')
         if not _cmd_needs_quotes(raw_exe) and not _cmd_needs_quotes(target):
             return f'command = "{exe} {tgt}"'
+        print('提示:解释器或插件路径含空格/cmd 元字符,命令行退回引号形态——'
+              '该形态在部分 CLI 构建的 TUI spawn 下可能静默失效(回退内置布局);'
+              '若 /reload-tui 后状态栏未出现,请把插件移到无空格路径后重装')
         return f'command = "\\"{exe}\\" \\"{tgt}\\""'
     return f'command = "python3 {target}"'
 
