@@ -44,3 +44,8 @@ jobs:
           python install.py
           python uninstall.py
           ! grep -q 'statusline\.py' "$KIMI_CODE_HOME/tui.toml"
+
+      - name: Windows 真机路径压测(真实 Node spawn 复刻 TUI 的 cmd /d /s /c + detached 不闪窗 + UTF-8)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -File ./tests/windows-e2e.ps1

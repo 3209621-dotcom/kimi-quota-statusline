@@ -22,7 +22,8 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
-| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配)共 28 例,`python3 tests/test_regressions.py` |
+| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配、doctor OSError 兜底)共 30 例,`python3 tests/test_regressions.py` |
+| `tests/windows-e2e.ps1` | Windows 真机验收(PowerShell):真实 Node spawn 复刻 TUI 的 cmd /d /s /c 链路 + 元字符路径压测 + detached 不闪窗 + UTF-8;自动项已入 CI windows job,手动项(真实 TUI 肉眼)见脚本尾部清单 |
 | `.github/workflows/ci.yml` | 三平台 CI(windows / ubuntu / macos):回归 + 中文路径冒烟渲染 + 安装/卸载往返 |
 | `assets/` | `hero.svg`(README 顶部横幅:手写 SVG + SMIL 动画,品牌蓝渐变标题 + 三句打字机标语,改文案直接编辑;本地预览用 Chrome headless 截图)+ 演示素材 `statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
 | `docs/MAINTAINING.md` | 本文档 |
@@ -75,7 +76,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 
 ## 七、CLI 更新后的兼容性巡检
 
-Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.35.0(2026-08-12 全部通过;0.35.0 的 compaction token 计数修复只影响 ctx 读数,本插件不显示 ctx,无影响)。
+Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.36.0(2026-08-13 全部通过;`status-line-command.ts` / `managed-usage.ts` 与 0.35.0 逐字节相同,#2874 swarm 重构为纯目录搬迁、wire 记录 `swarm_mode.enter/exit` 与 payload 未变;新增实验性全屏 TUI(pi-tui rebaseline 未触碰 status/footer 文件)与 subagent 模型池,均不影响本插件,全屏模式待真机肉眼验证)。
 
 1. **官方 changelog 对照**:https://www.kimi.com/code/docs/en/kimi-code-cli/release-notes/changelog.html ,搜 status_line / plugin / wire / usages 相关条目。
 2. **stdin 快照字段**:`cat ~/.kimi-code/statusline-stdin.json` —— 应含 `model, cwd, gitBranch, permissionMode, planMode, contextUsage, contextTokens, maxContextTokens, sessionId, version`。
@@ -92,7 +93,8 @@ Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通�
 - 不要把耗时操作放进主流程(300ms 超时会被 SIGKILL,整行回退内置布局)——重活一律走 detached refresh。
 - 多行输出无效:只有 stdout 第一行会被渲染。
 - Windows:后台刷新 Popen 必须用 `DETACHED_PROCESS`(否则闪控制台窗口),POSIX 才用 `start_new_session`;stdin 快照走 `sys.stdin.buffer` 按 UTF-8 解,stdout 也要 `reconfigure(encoding='utf-8')`(控制台文本层可能是 GBK/cp1252,print 中文直接 UnicodeEncodeError);tui.toml 里 Windows 路径反斜杠按 TOML 双写转义,卸载匹配前先归一化(分隔符跟随写入平台,别用 `os.path.join` 拼路径来比对)。
-- 安装/卸载器对 tui.toml 的匹配一律**行级精确**:只认 command 行的值;注释或其他行提及插件路径不算数(section 级宽松匹配会误删指向他人脚本的 command,v1.2.0 评审发现并修复)。CI 覆盖不到 TUI 真实 spawn command 的端到端解析(CI 无 kimi 环境),Windows 真机未验证,发版时需注明。
+- 安装/卸载器对 tui.toml 的匹配一律**行级精确**:只认 command 行的值;注释或其他行提及插件路径不算数(section 级宽松匹配会误删指向他人脚本的 command,v1.2.0 评审发现并修复)。CI windows job 已用真实 Node spawn 复刻 TUI 的 cmd 引号解析 + detached 不闪窗(MainWindowHandle) + 元字符路径压测,但**真实 TUI 渲染**仍需真机肉眼确认。TUI 在 Windows 用 `cmd.exe /d /s /c` 解析 command,带引号路径含 `& ^ ( ) %` 等 cmd 元字符(如 Python 装在 `Program Files (x86)`)是最可能炸的点,`windows-e2e.ps1` 的 B 项专测这条。
+- Windows:kimi 为 npm 安装时是 `kimi.cmd` shim,`subprocess.run(['kimi', ...])` 直接 CreateProcess 会抛 WinError 193(OSError);doctor 校验须 `shell=(os.name == 'nt')` 并经 `except OSError` 兜底只提示不阻断(v1.2.1 修复,回归锁死)。
 
 ## 九、路线图(想法池)
 

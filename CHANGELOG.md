@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+- `tests/windows-e2e.ps1` Windows 真机验收脚本:用本机真实 Node 照抄 TUI 的 `spawn(cmd.exe, ['/d','/s','/c', command])` 链路验证带引号路径解析、元字符路径(中文/空格/括号/&)压测、detached 刷新不闪窗(MainWindowHandle=0)、UTF-8 中文输出;CI windows job 接入(此前 TUI spawn 端到端链路零覆盖)
+
+### Fixed
+- Windows:`kimi doctor tui` 在 npm 安装的 `kimi.cmd` shim 下直接 CreateProcess 抛 WinError 193(OSError),`check=False` 拦不住,安装/卸载器会崩出 traceback——doctor 校验改经 `cmd /c`(shell=True)转一道并 `except OSError` 兜底只提示不阻断(回归 +2)
+
 ## [1.2.0] - 2026-08-13
 
 ### Added
