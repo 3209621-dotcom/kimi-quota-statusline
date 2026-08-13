@@ -32,6 +32,24 @@ def build_command(target, os_name=None, executable=None):
     return f'command = "python3 {target}"'
 
 
+def _doctor(tui):
+    """kimi doctor tui 校验。Windows 下 kimi 常是 npm 生成的 kimi.cmd shim,
+    CreateProcess 无法直接执行 .cmd(抛 WinError 193),须经 cmd /c(shell=True)转一道;
+    运行层面失败只提示不阻断——配置已写入,是否生效以 /reload-tui 实况为准。"""
+    if not shutil.which('kimi'):
+        return 0
+    try:
+        r = subprocess.run(['kimi', 'doctor', 'tui', tui],
+                           check=False, shell=(os.name == 'nt'))
+    except OSError:
+        print('提示:kimi doctor 未能自动运行,运行 /reload-tui 观察状态栏是否生效即可')
+        return 0
+    if r.returncode != 0:
+        return r.returncode
+    print('kimi doctor 校验通过')
+    return 0
+
+
 def install(tui, target, os_name=None, executable=None, doctor=True):
     """把 [status_line].command 写入 tui(指向 target)。返回退出码。"""
     cmd_line = build_command(target, os_name, executable)
@@ -65,11 +83,8 @@ def install(tui, target, os_name=None, executable=None, doctor=True):
     _write_atomic(tui, text)
     print(f'已写入: {tui}')
 
-    if doctor and shutil.which('kimi'):
-        r = subprocess.run(['kimi', 'doctor', 'tui', tui], check=False)
-        if r.returncode != 0:
-            return r.returncode
-        print('kimi doctor 校验通过')
+    if doctor:
+        return _doctor(tui)
     return 0
 
 

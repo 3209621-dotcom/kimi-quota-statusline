@@ -20,6 +20,24 @@ def _write_atomic(path, text):
     os.replace(tmp, path)
 
 
+def _doctor(tui):
+    """kimi doctor tui 校验。Windows 下 kimi 常是 npm 生成的 kimi.cmd shim,
+    CreateProcess 无法直接执行 .cmd(抛 WinError 193),须经 cmd /c(shell=True)转一道;
+    运行层面失败只提示不阻断——配置已写入,是否生效以 /reload-tui 实况为准。"""
+    if not shutil.which('kimi'):
+        return 0
+    try:
+        r = subprocess.run(['kimi', 'doctor', 'tui', tui],
+                           check=False, shell=(os.name == 'nt'))
+    except OSError:
+        print('提示:kimi doctor 未能自动运行,运行 /reload-tui 观察状态栏是否生效即可')
+        return 0
+    if r.returncode != 0:
+        return r.returncode
+    print('kimi doctor 校验通过')
+    return 0
+
+
 def uninstall(tui, plugin_dir, doctor=True):
     """把指向 plugin_dir/statusline.py 的 command 从 tui 移除;空 section 一并删除。返回退出码。"""
     if not os.path.exists(tui):
@@ -52,11 +70,8 @@ def uninstall(tui, plugin_dir, doctor=True):
     _write_atomic(tui, text)
     print(f'已从 {tui} 移除插件配置(备份已生成)')
 
-    if doctor and shutil.which('kimi'):
-        r = subprocess.run(['kimi', 'doctor', 'tui', tui], check=False)
-        if r.returncode != 0:
-            return r.returncode
-        print('kimi doctor 校验通过')
+    if doctor:
+        return _doctor(tui)
     return 0
 
 

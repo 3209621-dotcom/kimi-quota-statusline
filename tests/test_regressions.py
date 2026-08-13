@@ -267,6 +267,36 @@ if _inst:
           line_mix == 'command = "\\"C:\\\\程序 Files\\\\python.exe\\" '
                       '\\"C:\\\\用户\\\\我的项目\\\\kimi-quota-statusline\\\\statusline.py\\""')
 
+    # Windows 特有坑:kimi 是 npm 生成的 kimi.cmd shim 时 CreateProcess 抛 WinError 193
+    # (OSError)——doctor 失败只提示不阻断,配置已写入不得判安装失败(回归锁死)
+    home8 = tempfile.mkdtemp()
+    tui8 = os.path.join(home8, 'tui.toml')
+    tgt8 = os.path.join(home8, 'statusline.py')
+    open(tgt8, 'w').close()
+    saved_run, saved_which = _inst.subprocess.run, _inst.shutil.which
+    _inst.shutil.which = lambda *a, **k: 'C:/npm/kimi.CMD'
+
+    def _boom(*a, **k):
+        raise OSError(193, 'not a valid Win32 application')
+
+    _inst.subprocess.run = _boom
+    try:
+        rc = _inst.install(tui8, tgt8, doctor=True)
+        check('doctor OSError(kimi.cmd shim):安装不阻断且返回 0',
+              rc == 0 and 'statusline.py' in open(tui8, encoding='utf-8').read())
+    finally:
+        _inst.subprocess.run, _inst.shutil.which = saved_run, saved_which
+
+    saved_run2, saved_which2 = _uninst.subprocess.run, _uninst.shutil.which
+    _uninst.shutil.which = lambda *a, **k: 'C:/npm/kimi.CMD'
+    _uninst.subprocess.run = _boom
+    try:
+        rc = _uninst.uninstall(tui8, home8, doctor=True)
+        check('doctor OSError(kimi.cmd shim):卸载不阻断且返回 0',
+              rc == 0 and 'statusline.py' not in open(tui8, encoding='utf-8').read())
+    finally:
+        _uninst.subprocess.run, _uninst.shutil.which = saved_run2, saved_which2
+
 print()
 if FAILED:
     print(f'{len(FAILED)} 个用例失败')
