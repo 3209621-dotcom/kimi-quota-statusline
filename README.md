@@ -7,7 +7,6 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
   <img src="https://img.shields.io/badge/python-3-3776ab?logo=python&logoColor=white" alt="Python 3" />
   <img src="https://img.shields.io/badge/kimi--code-%E2%89%A5%200.30.0-4fa8ff" alt="Kimi Code >= 0.30.0" />
-  <a href="https://github.com/3209621-dotcom/kimi-quota-statusline/stargazers"><img src="https://img.shields.io/github/stars/3209621-dotcom/kimi-quota-statusline?style=social" alt="GitHub stars" /></a>
 </p>
 
 <p>
@@ -19,7 +18,7 @@
 
 ---
 
-Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密集的彩色状态栏，额度数据**与 `/usage` 完全同源**（直连官方 `GET /coding/v1/usages` 接口）。
+Kimi Code CLI 状态栏增强：**额度、消耗、swarm 状态一眼看清**。额度数据与 `/usage` 完全同源（直连官方 `GET /coding/v1/usages` 接口）。
 
 ![状态栏效果](assets/statusline.png)
 
@@ -27,22 +26,13 @@ Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密
 
 ![swarm 水波动效](assets/swarm.gif)
 
-## 显示内容
+- ✅ `5h` / `7d` 官方额度条：6 格进度 + 已用百分比 + 重置倒计时，绿/黄/红三档
+- ✅ 本会话 token 与估算金额（官方定价口径，仅当前会话）
+- ✅ 权限模式 / 模型·思考强度 / git 分支 / 项目目录
+- ✅ swarm 模式品牌蓝水波动效（约 8 秒）
+- ⚡ 单次运行 < 50ms（token 统计走缓存，300ms 预算内）
 
-| 段 | 内容 | 数据来源 |
-|---|---|---|
-| 权限模式 | `YOLO` / `AUTO` / `MANUAL`（大写，分色） | 状态栏 stdin 快照 |
-| 模型·思考强度 `[上下文]` | `K3·max [1M]`，强度从当前会话 wire 日志重建 | wire.jsonl |
-| swarm 特效 | 进入时品牌蓝水波双向扩散（~8s)，随后静态蓝标 | wire.jsonl `swarm_mode.*` |
-| `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时，绿/黄/红三档 | **官方 `/usages` 接口**（超 10 分钟未更新压暗加 `~`，无数据不显示） |
-| 本会话消耗 | token 量 + 估算金额（仅当前会话，不含其他会话） | 当前会话 wire.jsonl `usage.record` 聚合 |
-| git 分支 / 项目目录 | ⎇ 分支、目录名 | stdin 快照 |
-
-## 金额口径
-
-按 Kimi 开放平台官方定价逐条累计（K3：输入 ¥20/百万 token、缓存命中 ¥2/百万、输出 ¥100/百万；缓存创建按标准输入价计）。是"等值估算"，套餐内实际不扣费。
-
-## 安装
+## 快速安装
 
 方式一（推荐，作为插件）:
 
@@ -56,10 +46,25 @@ Kimi Code CLI 底部状态栏增强插件：把底部第一行替换为信息密
 ```bash
 git clone https://github.com/3209621-dotcom/kimi-quota-statusline.git
 python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusline\install.py
-# 自动备份 tui.toml、写入 [status_line].command、kimi doctor 校验;然后在 TUI 运行 /reload-tui
+# 自动备份 tui.toml、写入 [status_line].command、kimi doctor 校验；然后在 TUI 运行 /reload-tui
 ```
 
-要求：Kimi Code CLI ≥ 0.30.0(`[status_line]` 特性），Python 3,macOS / Linux / Windows。
+要求：Kimi Code CLI ≥ 0.30.0（`[status_line]` 特性）、Python 3、macOS / Linux / Windows。
+
+## 显示内容
+
+| 段 | 内容 | 数据来源 |
+|---|---|---|
+| 权限模式 | `YOLO` / `AUTO` / `MANUAL`（大写，分色） | 状态栏 stdin 快照 |
+| 模型·思考强度 `[上下文]` | `K3·max [1M]`，强度从当前会话 wire 日志重建 | wire.jsonl |
+| swarm 特效 | 进入时品牌蓝水波双向扩散（~8s），随后静态蓝标 | wire.jsonl `swarm_mode.*` |
+| `5h` / `7d` 额度条 | 6 格进度条 + 已用百分比 + 重置倒计时，绿/黄/红三档 | **官方 `/usages` 接口**（超 10 分钟未更新压暗加 `~`，无数据不显示） |
+| 本会话消耗 | token 量 + 估算金额（仅当前会话，不含其他会话） | 当前会话 wire.jsonl `usage.record` 聚合 |
+| git 分支 / 项目目录 | ⎇ 分支、目录名 | stdin 快照 |
+
+## 金额口径
+
+按 Kimi 开放平台官方定价逐条累计（K3：输入 ¥20/百万 token、缓存命中 ¥2/百万、输出 ¥100/百万；缓存创建按标准输入价计）。是"等值估算"，套餐内实际不扣费。
 
 ## 卸载
 
@@ -94,7 +99,7 @@ python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusli
 
 # Kimi Quota Statusline
 
-A status line plugin for [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) (≥ 0.30.0). It replaces the footer's first line with a dense, colorful status bar whose quota data comes **straight from the official `GET /coding/v1/usages` endpoint — the same source as the built-in `/usage` command**.
+A status line plugin for [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) (≥ 0.30.0) — **quota, session spend, and swarm state at a glance**. Quota data comes straight from the official `GET /coding/v1/usages` endpoint, the same source as the built-in `/usage` command.
 
 ![status line](assets/statusline.png)
 
@@ -102,22 +107,13 @@ When **swarm mode** is entered, a brand-blue (`#4FA8FF`) water ripple spreads ou
 
 ![swarm ripple effect](assets/swarm.gif)
 
-## What it shows
+- ✅ `5h` / `7d` official quota bars: 6-cell progress + used % + reset countdown, green/yellow/red
+- ✅ Current-session tokens + estimated cost (official pricing, this session only)
+- ✅ Permission mode / model · thinking effort / git branch / directory
+- ✅ Brand-blue water-ripple burst on swarm mode (~8 s)
+- ⚡ Runs in < 50 ms (token stats served from cache, within the 300 ms budget)
 
-| Segment | Content | Source |
-| --- | --- | --- |
-| Permission mode | `YOLO` / `AUTO` / `MANUAL` (uppercase, color-coded) | status line stdin snapshot |
-| Model · effort `[context]` | `K3·max [1M]`; effort rebuilt from the session wire log | `wire.jsonl` |
-| swarm effect | water-ripple burst on entry, then a static brand-blue marker | `wire.jsonl` `swarm_mode.*` |
-| `5h` / `7d` quota bars | 6-cell bar + used % + reset countdown, green/yellow/red | **official `/usages` endpoint** (dimmed with a `~` marker when stale > 10 min; hidden when unavailable) |
-| Current session usage | tokens + estimated cost (this session only) | current session's `wire.jsonl` `usage.record` aggregation |
-| git branch / directory | ⎇ branch, basename of cwd | stdin snapshot |
-
-## Cost estimation
-
-Per-token pricing follows Kimi's official open-platform rates (K3: input ¥20/M tokens, cached input ¥2/M, output ¥100/M; cache creation billed as standard input). It is an *equivalent* estimate — plan usage itself is not billed per token.
-
-## Install
+## Quick install
 
 As a plugin (recommended):
 
@@ -135,6 +131,21 @@ python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusli
 ```
 
 Requirements: Kimi Code CLI ≥ 0.30.0 (the `[status_line]` feature), Python 3, macOS / Linux / Windows.
+
+## What it shows
+
+| Segment | Content | Source |
+| --- | --- | --- |
+| Permission mode | `YOLO` / `AUTO` / `MANUAL` (uppercase, color-coded) | status line stdin snapshot |
+| Model · effort `[context]` | `K3·max [1M]`; effort rebuilt from the session wire log | `wire.jsonl` |
+| swarm effect | water-ripple burst on entry, then a static brand-blue marker | `wire.jsonl` `swarm_mode.*` |
+| `5h` / `7d` quota bars | 6-cell bar + used % + reset countdown, green/yellow/red | **official `/usages` endpoint** (dimmed with a `~` marker when stale > 10 min; hidden when unavailable) |
+| Current session usage | tokens + estimated cost (this session only) | current session's `wire.jsonl` `usage.record` aggregation |
+| git branch / directory | ⎇ branch, basename of cwd | stdin snapshot |
+
+## Cost estimation
+
+Per-token pricing follows Kimi's official open-platform rates (K3: input ¥20/M tokens, cached input ¥2/M, output ¥100/M; cache creation billed as standard input). It is an *equivalent* estimate — plan usage itself is not billed per token.
 
 ## Uninstall
 
