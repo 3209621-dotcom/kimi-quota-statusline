@@ -10,7 +10,14 @@ import subprocess
 import sys
 import time
 
-SECTION_RE = r'(?ms)^\[status_line\]\n.*?(?=^\[|\Z)'
+SECTION_RE = r'(?ms)^\[status_line\][ \t]*\r?\n.*?(?=^\[|\Z)'
+
+
+def _write_atomic(path, text):
+    """原子覆盖写:先写临时文件再替换,避免写一半崩溃留下截断的配置。"""
+    tmp = path + '.tmp'
+    open(tmp, 'w', encoding='utf-8').write(text)
+    os.replace(tmp, path)
 
 
 def uninstall(tui, plugin_dir, doctor=True):
@@ -28,17 +35,21 @@ def uninstall(tui, plugin_dir, doctor=True):
 
     def repl(m):
         body = m.group(0)
-        plain = body.replace('\\\\', '\\')  # TOML 转义归一化后再比对
-        # 不用 os.path.join 拼完整路径:写入方的路径分隔符跟随写入平台,与当前平台无关
-        if plugin_dir in plain and 'statusline.py' in plain:
-            body = re.sub(r'(?m)^command\s*=.*\n?', '', body, count=1)
+        # 行级精确匹配:只删值里同时含插件目录与 statusline.py 的 command 行;
+        # 注释或其他行里提及插件路径不算数(分隔符跟随写入平台,先归一化再比对)
+        def is_ours(line):
+            if not re.match(r'\s*command\s*=', line):
+                return False
+            v = line.split('=', 1)[1].replace('\\\\', '\\')
+            return plugin_dir in v and 'statusline.py' in v
+        body = '\n'.join(l for l in body.split('\n') if not is_ours(l))
         rest = body.split('\n', 1)[1] if '\n' in body else ''
         if not re.search(r'(?m)^[a-zA-Z_]+\s*=', rest):
             return ''  # section 只剩表头则整体移除
         return body
 
     text = re.sub(SECTION_RE, repl, text)
-    open(tui, 'w', encoding='utf-8').write(text)
+    _write_atomic(tui, text)
     print(f'已从 {tui} 移除插件配置(备份已生成)')
 
     if doctor and shutil.which('kimi'):

@@ -11,7 +11,14 @@ import subprocess
 import sys
 import time
 
-SECTION_RE = r'(?ms)^\[status_line\]\n.*?(?=^\[|\Z)'
+SECTION_RE = r'(?ms)^\[status_line\][ \t]*\r?\n.*?(?=^\[|\Z)'
+
+
+def _write_atomic(path, text):
+    """原子覆盖写:先写临时文件再替换,避免写一半崩溃留下截断的配置。"""
+    tmp = path + '.tmp'
+    open(tmp, 'w', encoding='utf-8').write(text)
+    os.replace(tmp, path)
 
 
 def build_command(target, os_name=None, executable=None):
@@ -29,18 +36,22 @@ def install(tui, target, os_name=None, executable=None, doctor=True):
     """把 [status_line].command 写入 tui(指向 target)。返回退出码。"""
     cmd_line = build_command(target, os_name, executable)
     text = open(tui, encoding='utf-8').read() if os.path.exists(tui) else ''
+    if text and not text.endswith('\n'):
+        text += '\n'  # 裸 [status_line] 收尾的文件,补换行让 section 可被匹配
 
-    if target in text or target.replace('\\', '\\\\') in text:
+    m = re.search(SECTION_RE, text)
+    sec = m.group(0) if m else ''
+    if target in sec or target.replace('\\', '\\\\') in sec:
         print('已安装:[status_line].command 已指向本插件,无需变更')
         return 0
 
-    if re.search(r'(?ms)^\[status_line\]\n(?:(?!\n\[).)*?^command\s*=', text):
+    if re.search(r'(?m)^command\s*=', sec):
         print('提示:[status_line].command 当前指向其他脚本,将被覆盖为插件版本(原文件已备份)')
 
     if os.path.exists(tui):
         shutil.copy(tui, f'{tui}.{time.strftime("%Y%m%d-%H%M%S")}.bak')
 
-    if re.search(SECTION_RE, text):
+    if sec:
         def repl(m):
             body = m.group(0)
             if re.search(r'(?m)^command\s*=', body):
@@ -48,12 +59,10 @@ def install(tui, target, os_name=None, executable=None, doctor=True):
             return body.rstrip('\n') + '\n' + cmd_line + '\n'
         text = re.sub(SECTION_RE, repl, text)
     else:
-        if text and not text.endswith('\n'):
-            text += '\n'
         text += f'\n[status_line]\n{cmd_line}\n'
 
     os.makedirs(os.path.dirname(tui), exist_ok=True)
-    open(tui, 'w', encoding='utf-8').write(text)
+    _write_atomic(tui, text)
     print(f'已写入: {tui}')
 
     if doctor and shutil.which('kimi'):

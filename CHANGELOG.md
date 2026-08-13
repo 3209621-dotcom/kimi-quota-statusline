@@ -7,7 +7,7 @@
 ## [1.2.0] - 2026-08-13
 
 ### Added
-- Windows 支持:后台刷新进程按平台分支(Windows 用 `DETACHED_PROCESS`,不再闪控制台窗口);stdin 快照与 debug 写入强制 UTF-8(非 UTF-8 locale 下中文路径不再崩溃);跨平台安装器 `install.py` / `uninstall.py`(`install.sh` / `uninstall.sh` 保留为兼容壳)
+- Windows 支持:后台刷新进程按平台分支(Windows 用 `DETACHED_PROCESS`,不再闪控制台窗口);stdin/stdout 强制 UTF-8(非 UTF-8 locale 下中文路径不再崩溃);跨平台安装器 `install.py` / `uninstall.py`(`install.sh` / `uninstall.sh` 保留为兼容壳)。注:TUI 真实拉起状态栏命令(带引号路径的解析、detached 不闪窗)在 Windows 真机上未做端到端验证,覆盖到 CI 冒烟为止
 - 三平台 CI(`.github/workflows/ci.yml`):windows / ubuntu / macos 跑回归测试 + 中文路径冒烟渲染 + 安装/卸载往返
 - README 顶部居中 hero 横幅(`assets/hero.svg`:品牌蓝渐变大标题 + 打字机轮换标语)+ 徽章行
 - 安装完成后的一次性 Star 提示(安装器输出 + install 斜杠命令告知,只提一次)

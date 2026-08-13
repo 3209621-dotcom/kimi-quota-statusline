@@ -220,6 +220,53 @@ if _inst:
     check('nt 卸载:转义路径同样识别并移除',
           rc == 0 and 'statusline.py' not in open(tui3, encoding='utf-8').read())
 
+    # 卸载不误伤(code review 发现的退化):section 内注释提及插件路径、command 指向
+    # 他人脚本时,command 必须保留——卸载是行级精确匹配,不是 section 级宽松匹配
+    home4 = tempfile.mkdtemp()
+    tui4 = os.path.join(home4, 'tui.toml')
+    pdir4 = os.path.join(home4, 'kimi-quota-statusline')
+    open(tui4, 'w', encoding='utf-8').write(
+        f'[status_line]\n# was {pdir4}/statusline.py\ncommand = "python3 /other/x.py"\n')
+    _uninst.uninstall(tui4, pdir4, doctor=False)
+    check('卸载不误伤:注释提及插件但 command 指向他人时保留',
+          '/other/x.py' in open(tui4, encoding='utf-8').read())
+
+    # 安装:tui.toml 以无尾换行的裸 [status_line] 结尾时不得产出重复 section(非法 TOML)
+    home5 = tempfile.mkdtemp()
+    tui5 = os.path.join(home5, 'tui.toml')
+    open(tui5, 'w', encoding='utf-8').write('[editor]\ntheme = "x"\n\n[status_line]')
+    _inst.install(tui5, os.path.join(home5, 'statusline.py'), doctor=False)
+    text5 = open(tui5, encoding='utf-8').read()
+    check('裸 section 头(无尾换行):不重复追加 section',
+          text5.count('[status_line]') == 1 and 'statusline.py' in text5)
+
+    # 幂等收窄:插件路径只出现在其他 section 的注释里、command 指向他人时,必须照常安装
+    home6 = tempfile.mkdtemp()
+    tui6 = os.path.join(home6, 'tui.toml')
+    tgt6 = os.path.join(home6, 'kimi-quota-statusline', 'statusline.py')
+    open(tui6, 'w', encoding='utf-8').write(
+        f'[status_line]\ncommand = "python3 /other/x.py"\n\n[editor]\n# see {tgt6}\n')
+    _inst.install(tui6, tgt6, doctor=False)
+    text6 = open(tui6, encoding='utf-8').read()
+    check('幂等收窄:路径仅在他处注释时仍正常安装',
+          '/other/x.py' not in text6 and tgt6 in text6)
+
+    # CRLF 换行的 tui.toml(Windows 记事本编辑过)也能识别已有 section
+    home7 = tempfile.mkdtemp()
+    tui7 = os.path.join(home7, 'tui.toml')
+    open(tui7, 'w', encoding='utf-8', newline='').write(
+        '[status_line]\r\ncommand = "python3 /other/x.py"\r\n')
+    _inst.install(tui7, os.path.join(home7, 'statusline.py'), doctor=False)
+    check('CRLF:识别已有 section 不重复追加',
+          open(tui7, encoding='utf-8').read().count('[status_line]') == 1)
+
+    # nt 中文+空格混合路径:转义正确(CI 三平台路径全 ASCII,锁死这个组合)
+    line_mix = _inst.build_command('C:\\用户\\我的项目\\kimi-quota-statusline\\statusline.py',
+                                   os_name='nt', executable='C:\\程序 Files\\python.exe')
+    check('nt 中文+空格路径:转义正确',
+          line_mix == 'command = "\\"C:\\\\程序 Files\\\\python.exe\\" '
+                      '\\"C:\\\\用户\\\\我的项目\\\\kimi-quota-statusline\\\\statusline.py\\""')
+
 print()
 if FAILED:
     print(f'{len(FAILED)} 个用例失败')

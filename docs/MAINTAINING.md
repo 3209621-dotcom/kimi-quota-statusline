@@ -22,7 +22,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
-| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdin UTF-8、安装器)共 22 例,`python3 tests/test_regressions.py` |
+| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配)共 28 例,`python3 tests/test_regressions.py` |
 | `.github/workflows/ci.yml` | 三平台 CI(windows / ubuntu / macos):回归 + 中文路径冒烟渲染 + 安装/卸载往返 |
 | `assets/` | `hero.svg`(README 顶部横幅:手写 SVG + SMIL 动画,品牌蓝渐变标题 + 三句打字机标语,改文案直接编辑;本地预览用 Chrome headless 截图)+ 演示素材 `statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
 | `docs/MAINTAINING.md` | 本文档 |
@@ -91,7 +91,8 @@ Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通�
 - `[status_line].command` 只接管底部**第一行**;第二行(原生 context 读数)是 `footer.ts` 写死的,关不掉,所以本插件不显示 ctx 条(避免重复)。
 - 不要把耗时操作放进主流程(300ms 超时会被 SIGKILL,整行回退内置布局)——重活一律走 detached refresh。
 - 多行输出无效:只有 stdout 第一行会被渲染。
-- Windows:后台刷新 Popen 必须用 `DETACHED_PROCESS`(否则闪控制台窗口),POSIX 才用 `start_new_session`;stdin 快照走 `sys.stdin.buffer` 按 UTF-8 解(控制台文本层可能是 GBK/cp1252);tui.toml 里 Windows 路径反斜杠按 TOML 双写转义,卸载匹配前先归一化(分隔符跟随写入平台,别用 `os.path.join` 拼路径来比对)。
+- Windows:后台刷新 Popen 必须用 `DETACHED_PROCESS`(否则闪控制台窗口),POSIX 才用 `start_new_session`;stdin 快照走 `sys.stdin.buffer` 按 UTF-8 解,stdout 也要 `reconfigure(encoding='utf-8')`(控制台文本层可能是 GBK/cp1252,print 中文直接 UnicodeEncodeError);tui.toml 里 Windows 路径反斜杠按 TOML 双写转义,卸载匹配前先归一化(分隔符跟随写入平台,别用 `os.path.join` 拼路径来比对)。
+- 安装/卸载器对 tui.toml 的匹配一律**行级精确**:只认 command 行的值;注释或其他行提及插件路径不算数(section 级宽松匹配会误删指向他人脚本的 command,v1.2.0 评审发现并修复)。CI 覆盖不到 TUI 真实 spawn command 的端到端解析(CI 无 kimi 环境),Windows 真机未验证,发版时需注明。
 
 ## 九、路线图(想法池)
 

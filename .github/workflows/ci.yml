@@ -25,7 +25,7 @@ jobs:
       - name: 回归测试
         run: python tests/test_regressions.py
 
-      - name: 冒烟渲染(中文路径 + 隔离 HOME)
+      - name: 冒烟渲染(中文路径;HOME 隔离仅 POSIX 生效,Windows 的 Python 用 USERPROFILE,runner 即用即弃无害)
         env:
           KIMI_SL_NOCOLOR: '1'
           HOME: ${{ runner.temp }}/home
