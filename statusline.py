@@ -484,7 +484,7 @@ def main():
         tps = live_tps(sid) or session_tps(sess)
         if tps > 0:
             tps_txt = f'{tps:.1f}' if tps < 100 else fmt_tokens(int(tps))
-            seg += ' ' + c(f'{tps_txt}T/s', MAGENTA)
+            seg += ' ' + c(f'{tps_txt}t/s', MAGENTA)
         line1.append(seg)
     cwd = pick(snap, 'cwd', 'work_dir', 'workDir')
     if cwd:
