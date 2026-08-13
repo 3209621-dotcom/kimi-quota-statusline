@@ -103,6 +103,36 @@ check('同块 [enter, exit]:不显示 swarm', statusline.session_state(sid)[1] i
 sid, _ = make_wire(10, [enter, exit_, enter])
 check('同块 [enter, exit, enter]:显示 swarm', statusline.session_state(sid)[1] is True)
 
+# ---- TPS:最近 60s 窗口聚合 ----
+tmp_tps = tempfile.mkdtemp()
+statusline.SESSIONS = tmp_tps
+sid_t = 'sess_tps'
+d_t = os.path.join(tmp_tps, 'wd_t', sid_t, 'agents', 'main')
+os.makedirs(d_t)
+
+
+def rec_t(t_ms, n):
+    return json.dumps({'type': 'usage.record',
+                       'usage': {'inputOther': n, 'output': 0,
+                                 'inputCacheRead': 0, 'inputCacheCreation': 0},
+                       'time': t_ms})
+
+
+now_ms = int(time.time() * 1000)
+with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
+    f.write('\n'.join([rec_t(now_ms - 61000, 9999),  # 窗口外,不计(时间序在最前)
+                       rec_t(now_ms - 3000, 70),    # 窗口内 70
+                       rec_t(now_ms - 2000, 20),    # 窗口内 20
+                       rec_t(now_ms - 1000, 10)])   # 窗口内 10,合计 100
+          + '\n')
+check('tps_window:60s 窗口聚合=100/60,窗口外记录不计', statusline.tps_window(sid_t) == 100 / 60)
+check('tps_window:未知会话返回 0', statusline.tps_window('sess_none') == 0.0)
+check('tps_window:空 sessionId 返回 0', statusline.tps_window('') == 0.0)
+# 全窗口外(空闲会话):0
+with open(os.path.join(d_t, 'wire.jsonl'), 'w') as f:
+    f.write(rec_t(now_ms - 300000, 42) + '\n')
+check('tps_window:全部记录跨出窗口(空闲)返回 0', statusline.tps_window(sid_t) == 0.0)
+
 # ---- Windows 适配(v1.2.0):detached 参数 / stdin UTF-8 / 跨平台安装器 ----
 # A. detached 刷新进程的 Popen 参数按平台分支(Windows 用 DETACHED_PROCESS 防闪控制台窗口)
 dk = statusline._detached_kwargs('posix') if hasattr(statusline, '_detached_kwargs') else None

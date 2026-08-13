@@ -2,14 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
-## [Unreleased]
+## [1.3.0] - 2026-08-13
+
+### Added
+- **实时 TPS**(tokens/s):最近 60s 滚动窗口聚合当前会话 wire.jsonl 的 `usage.record`(自尾向前扫描、跨出窗口即停,上限 2MB),显示在会话 token/金额段之后,空闲为 0 时隐藏;窗口大小可调(`TPS_WINDOW_S` 常量);回归 +4
+- `tests/windows-e2e.ps1` Windows 真机验收脚本:用本机真实 Node 复刻 TUI 的 `spawn(cmd.exe, ['/d','/s','/c', command])` 链路验证引号解析、元字符路径(中文/空格/括号/&)压测、detached 刷新不闪窗(MainWindowHandle=0)、UTF-8 中文输出;CI windows job 接入(此前 TUI spawn 端到端链路零覆盖)
 
 ### Fixed
 - Windows 真机三连修:install.py 的 `re.sub` 替换串吃掉路径双反斜杠写出非法 TOML(改 lambda 替换,`tomllib` 往返校验锁死);无空格/元字符路径改裸写 command(libuv quoting 把内嵌引号转 `\"` 喂给 cmd 导致命令每次失败、TUI 静默回退内置布局,裸写在全部已知 spawn 形态下可跑,含元字符退回引号形态并打警告);`tests/windows-e2e.ps1` 补 UTF-8 BOM(PS5.1 按 ANSI 解析中文炸语法)、探针改 verbatim+外包引号(与 kimi.exe 实跑一致)、修正 fake-home 的 `.kimi-code` 路径笔误
-- Windows:`kimi doctor tui` 在 npm 安装的 `kimi.cmd` shim 下直接 CreateProcess 抛 WinError 193(OSError),`check=False` 拦不住,安装/卸载器会崩出 traceback——doctor 校验改经 `cmd /c`(shell=True)转一道并 `except OSError` 兜底只提示不阻断(回归 +2)
+- Windows:引号回退兜底——元字符集补 `,` `;` `=`(cmd 参数分隔符,裸写路径会被切碎)
+- Windows:`kimi doctor tui` 在 npm 安装的 `kimi.cmd` shim 下直接 CreateProcess 抛 WinError 193(OSError),`check=False` 拦不住,安装/卸载器会崩出 traceback——doctor 校验改经 `cmd /c`(shell=True)转一道并 `except OSError` 兜底只提示不阻断
 
-### Added
-- `tests/windows-e2e.ps1` Windows 真机验收脚本:用本机真实 Node 照抄 TUI 的 `spawn(cmd.exe, ['/d','/s','/c', command])` 链路验证带引号路径解析、元字符路径(中文/空格/括号/&)压测、detached 刷新不闪窗(MainWindowHandle=0)、UTF-8 中文输出;CI windows job 接入(此前 TUI spawn 端到端链路零覆盖)
+### Changed
+- README 首屏打磨:利益导向一句式 + 卖点速览列表 + 快速安装提前 + 去 stars 徽章(中英三处同步)
 
 ## [1.2.0] - 2026-08-13
 
