@@ -8,7 +8,7 @@
 Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`statusline.py`(Python 3,零依赖)。
 通过 `tui.toml` 的 `[status_line].command` 接入 TUI:TUI 每秒(硬编码上限)把 JSON 快照喂给 stdin,取 stdout 第一行渲染到底部第一行。
 
-- 仓库:https://github.com/3209621-dotcom/kimi-quota-statusline
+- 仓库:https://github.com/OrderG-X/kimi-quota-statusline
 - 本机项目目录(维护真源):`/Users/guo/Projects/kimi-quota-statusline`
 - 最终用户的安装形态:`/plugins install` 后由 CLI 拷贝到 `~/.kimi-code/plugins/managed/kimi-quota-statusline/`,`install.sh` 把 command 指向那里的 statusline.py
 

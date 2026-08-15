@@ -120,7 +120,7 @@ def main():
     rc = install(os.path.join(kc_home, 'tui.toml'), target)
     if rc == 0:
         print('安装完成。在 Kimi Code TUI 中运行 /reload-tui 立即生效(或重开新会话)。')
-        print('觉得好用的话,欢迎给个 Star ⭐ https://github.com/3209621-dotcom/kimi-quota-statusline')
+        print('觉得好用的话,欢迎给个 Star ⭐ https://github.com/OrderG-X/kimi-quota-statusline')
     return rc
 
 

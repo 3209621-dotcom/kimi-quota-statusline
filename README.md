@@ -3,7 +3,7 @@
 <img src="assets/hero.svg" alt="Kimi Quota Statusline — Kimi Code CLI 状态栏增强" width="760" />
 
 <p>
-  <a href="https://github.com/3209621-dotcom/kimi-quota-statusline/tags"><img src="https://img.shields.io/github/v/tag/3209621-dotcom/kimi-quota-statusline?label=version&color=4fa8ff" alt="version" /></a>
+  <a href="https://github.com/OrderG-X/kimi-quota-statusline/tags"><img src="https://img.shields.io/github/v/tag/OrderG-X/kimi-quota-statusline?label=version&color=4fa8ff" alt="version" /></a>
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
   <img src="https://img.shields.io/badge/python-3-3776ab?logo=python&logoColor=white" alt="Python 3" />
   <img src="https://img.shields.io/badge/kimi--code-%E2%89%A5%200.30.0-4fa8ff" alt="Kimi Code >= 0.30.0" />
@@ -37,14 +37,14 @@ Kimi Code CLI 状态栏增强：**额度、消耗、swarm 状态一眼看清**�
 方式一（推荐，作为插件）:
 
 ```
-/plugins install https://github.com/3209621-dotcom/kimi-quota-statusline
+/plugins install https://github.com/OrderG-X/kimi-quota-statusline
 /kimi-quota-statusline:install
 ```
 
 方式二（手动）:
 
 ```bash
-git clone https://github.com/3209621-dotcom/kimi-quota-statusline.git
+git clone https://github.com/OrderG-X/kimi-quota-statusline.git
 python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusline\install.py
 # 自动备份 tui.toml、写入 [status_line].command、kimi doctor 校验；然后在 TUI 运行 /reload-tui
 ```
@@ -118,14 +118,14 @@ When **swarm mode** is entered, a brand-blue (`#4FA8FF`) water ripple spreads ou
 As a plugin (recommended):
 
 ```
-/plugins install https://github.com/3209621-dotcom/kimi-quota-statusline
+/plugins install https://github.com/OrderG-X/kimi-quota-statusline
 /kimi-quota-statusline:install
 ```
 
 Or manually:
 
 ```bash
-git clone https://github.com/3209621-dotcom/kimi-quota-statusline.git
+git clone https://github.com/OrderG-X/kimi-quota-statusline.git
 python3 kimi-quota-statusline/install.py   # Windows: python kimi-quota-statusline\install.py
 # backs up tui.toml, writes [status_line].command, validates with kimi doctor; then run /reload-tui in the TUI
 ```
