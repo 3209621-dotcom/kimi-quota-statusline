@@ -2,7 +2,7 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
-## [Unreleased]
+## [1.3.1] - 2026-08-15
 
 ### Fixed
 - TPS 口径纠错并改实时:只计 output token(input/cacheRead 是每轮重发的上下文,v1.3.0 误计入后真机误显 5.9K/s,真实生成速度仅几十/s);速率=最近 3 次「llm.request→usage.record」配对的 output÷耗时均值(单次耗时含排队/思考/生成,即体感速度;业界 statusline 多为 tokens/min 燃烧率或会话平均,均非实时),空闲保留最后值不消失,老会话配对跌出尾部扫描窗口时回退会话平均;移除 60s 滚动窗口与 `TPS_WINDOW_S` 常量;显示单位 `t/s`
