@@ -71,7 +71,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 1. 改代码 + 本地测试(上面清单 + `python3 tests/test_regressions.py` 回归测试);push 后确认三平台 CI 绿再发版。
 2. 双语 README 同步;`CHANGELOG.md` 记录;`kimi.plugin.json` 的 `version` 升号。
 3. `git add -A && git commit && git push`(origin = GitHub 仓库)。
-4. 打 tag 并**发 GitHub Release**(必须,不是可选):`git tag v1.x.0 && git push --tags`,然后 `gh release create v1.x.0 --title v1.x.0 --notes <CHANGELOG 摘要>`。已安装用户的 `/plugins` 更新提示只认 Release,只推 main / 只打 tag 都不会产生提示。
+4. 打 tag 并**发 GitHub Release**:`git tag v1.x.0 && git push --tags`,然后 `gh release create v1.x.0 --title v1.x.0 --notes <CHANGELOG 摘要>`。Release 的作用:repo URL 安装优先解析最新 Release(用户装到 pinned tag 而非浮动 HEAD);若未来进入官方市场目录,GitHub 源条目的目录版本也由最新 Release 解析。注意:**TUI 的更新提示只来自官方市场目录,与是否发 Release 无关**。
 5. 已安装的用户侧升级:`/plugins` 面板 Installed 页会有更新提示,Enter 更新;或重新跑 install 命令。
 
 ## 七、CLI 更新后的兼容性巡检
@@ -98,7 +98,7 @@ Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通�
 - Windows 的 TUI spawn 引号语义(2026-08-13 真机实测,kimi.exe 用 verbatim 参数 + 外包引号):libuv 默认 quoting 会把内嵌引号转成 `\"` 喂给 cmd,cmd 不认反斜杠转义 → 带引号 command 每次失败、TUI 静默回退内置布局。因此 nt 命令**路径不含空格/cmd 元字符时裸写**(所有已知 spawn 形态都能跑),含元字符才退回引号形态(安装器此时打警告);元字符集含 `, ; =`(cmd 也当参数分隔符,`C:\a,b\x` 会被切碎)。
 - `install.py` 覆盖已有 command 时的 `re.sub` 必须用 lambda 替换:替换串里的 Windows `\\` 会被当正则转义吃掉,写出非法 TOML(2026-08-13 真机事故,回归用 tomllib 往返校验锁死)。
 - `tests/windows-e2e.ps1` 必须带 UTF-8 BOM 存盘:PS5.1 对无 BOM 文件按 ANSI 解析,中文注释直接语法错误。
-- `/plugins` 更新提示只认 GitHub **Release**(2026-08-15 排查确认):CLI 更新检测只走 github.com 重定向 + codeload 下载(不调 api.github.com),无 Release 的仓库 `releases/latest` 只会跳到 `/releases` 列表页,拿不到更新候选——只推 main、只打 tag 都不会产生更新提示。对照组 obra/superpowers 有 Release,更新提示正常。v1.3.1 起每次发版必须 `gh release create`。
+- `/plugins` 面板(TUI)的更新提示**只由官方市场目录驱动**(2026-08-15 对照 MoonshotAI/kimi-code 源码逐行确认):Installed 页徽标 = 市场目录条目版本 vs 已装 manifest 版本,按 plugin id 匹配(`plugins-selector.ts installedUpdateStatus`,不查安装来源);主动通知仅官方插件(`plugin-update-notifier.ts`,GitHub 安装被 `isOfficialPluginInstall` 明确排除)。不在目录里的 GitHub 源插件**永远不会**有 TUI 更新提示——与 Release、会话缓存、R 刷新、重启均无关。`manager.checkUpdates()` 的 GitHub release/branch/SHA 比对只经 kap-server REST 服务 web UI,TUI 从不调用。目录在 `https://code.kimi.com/kimi-code/plugins/marketplace.json`(官方维护,GitHub 源 curated 条目的版本由 `withLatestVersions` 按最新 Release 运行时解析)。对照组:superpowers 在 Curated 目录所以提示正常;本插件不在目录,出路是申请进 Curated 市场,或用户手动重装升级。
 
 ## 九、路线图(想法池)
 
