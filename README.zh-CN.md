@@ -34,10 +34,17 @@ Kimi Code CLI 状态栏增强：**额度、消耗、swarm 状态一眼看清**�
 
 ## 快速安装
 
-方式一（推荐，作为插件）:
+方式一（推荐，作为插件），在 Kimi Code 里依次运行两条命令。
+
+第一步，安装插件：
 
 ```
 /plugins install https://github.com/OrderG-X/kimi-quota-statusline
+```
+
+第二步，接管状态栏：
+
+```
 /kimi-quota-statusline:install
 ```
 
