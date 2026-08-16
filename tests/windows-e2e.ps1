@@ -210,7 +210,9 @@ for ($i = 0; $i -lt 60 -and -not $cacheOk; $i++) {
     if (Test-Path $cache) {
         try {
             $d = Get-Content $cache -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($d.sess.id -eq $sid -and $d.sess.tokens -eq 200000) { $cacheOk = $true }
+            $entry = $null
+            if ($d.sessions) { $entry = $d.sessions.PSObject.Properties[$sid].Value }
+            if ($null -ne $entry -and $entry.tokens -eq 200000) { $cacheOk = $true }
         } catch { }
     }
 }
