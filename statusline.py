@@ -27,6 +27,7 @@ DEBUG_STDIN = os.path.join(HOME, 'statusline-stdin.json')
 STALE_S = 20        # 缓存超过 20s 触发后台刷新
 LOCK_S = 60         # 刷新锁,避免并发刷新
 TAIL_BYTES = 524288
+MAX_CACHE_SESSIONS = 8  # 缓存里会话条目的上限,按最近活跃裁剪,防文件无限长大
 
 # 官方额度接口(源码 packages/oauth/src/managed-usage.ts):GET {base}/usages,Bearer 认证
 # 返回 usage(周配额)+ limits[](5h 等窗口)+ boosterWallet;used/limit 为百分制字符串
@@ -185,19 +186,26 @@ def refresh_cache(session_id='', ver=''):
     tmp = CACHE + '.tmp'
     # 官方额度:拉取成功则更新,失败保留上次结果
     official = fetch_official(ver)
-    prev = {}
-    if official is None or sess is None:
-        try:
-            prev = json.load(open(CACHE))
-        except Exception:
-            prev = {}
+    try:
+        prev = json.load(open(CACHE))
+    except Exception:
+        prev = {}
     if official is None:
         official = prev.get('official')
-    if sess is None:
-        sess = prev.get('sess')
+    # 会话条目用映射存储:并发会话各自刷新只写自己的槽位;旧版单槽位
+    # ('sess')会被另一窗口的刷新顶掉,导致 token/金额/TPS 段周期性消失
+    sessions = dict(prev.get('sessions') or {})
+    legacy = prev.get('sess')
+    if isinstance(legacy, dict) and legacy.get('id'):
+        sessions.setdefault(legacy['id'], legacy)
+    if sess is not None:
+        sessions[session_id] = sess
+    if len(sessions) > MAX_CACHE_SESSIONS:
+        sessions = dict(sorted(sessions.items(),
+                               key=lambda kv: kv[1].get('t1') or 0)[-MAX_CACHE_SESSIONS:])
     try:
         with open(tmp, 'w') as f:
-            json.dump({'ts': time.time(), 'sess': sess, 'official': official}, f)
+            json.dump({'ts': time.time(), 'sessions': sessions, 'official': official}, f)
         os.replace(tmp, CACHE)
     except OSError:
         pass
@@ -234,6 +242,17 @@ def load_tokens(session_id='', ver=''):
         except OSError:
             pass
     return cache or {}
+
+
+def pick_sess(cache, sid):
+    """从缓存取本会话条目:sessions 映射按 sid 取;旧版单槽位按 id 兜底(读兼容)。"""
+    if not sid or not cache:
+        return {}
+    s = (cache.get('sessions') or {}).get(sid)
+    if s:
+        return s
+    legacy = cache.get('sess') or {}
+    return legacy if legacy.get('id') == sid else {}
 
 
 def reset_hint(iso):
@@ -482,8 +501,8 @@ def main():
         line1.append(c(f'⎇ {git}', GREEN))
 
     # 本会话 token + 金额(按官方定价) + 实时 TPS(最近几次请求均值,空闲保留最后值) + 项目目录
-    sess = tokens.get('sess') or {}
-    if sid and sess.get('id') == sid:
+    sess = pick_sess(tokens, sid)
+    if sess:
         seg = c(fmt_tokens(sess.get('tokens', 0)), YELLOW)
         cost = sess.get('cost')
         if cost is not None:

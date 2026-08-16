@@ -22,7 +22,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 | `commands/*.md` | 插件斜杠命令(`/kimi-quota-statusline:install|uninstall`),body 是给 Agent 的提示词 |
 | `README.md` / `README.zh-CN.md` | 首页 README.md 为中文内联 + 英文 `<details>` 折叠;zh-CN 为独立中文文件;**任何行为变化必须三处同步(README.md 中英两段 + zh-CN)** |
 | `CHANGELOG.md` | Keep a Changelog 格式 |
-| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / TPS 窗口聚合 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配、doctor OSError 兜底、nt 命令形态)共 36 例,`python3 tests/test_regressions.py` |
+| `tests/test_regressions.py` | 回归测试(无框架):额度口径 / swarm 分块扫描 / TPS 窗口聚合 / 多会话缓存隔离 / Windows 适配(detached 参数、stdio UTF-8、安装器行级匹配、doctor OSError 兜底、nt 命令形态)共 50 例,`python3 tests/test_regressions.py` |
 | `tests/windows-e2e.ps1` | Windows 真机验收(PowerShell):真实 Node spawn 复刻 TUI 的 cmd /d /s /c 链路 + 元字符路径压测 + detached 不闪窗 + UTF-8;自动项已入 CI windows job,手动项(真实 TUI 肉眼)见脚本尾部清单 |
 | `.github/workflows/ci.yml` | 三平台 CI(windows / ubuntu / macos):回归 + 中文路径冒烟渲染 + 安装/卸载往返 |
 | `assets/` | `hero.svg`(README 顶部横幅:手写 SVG + SMIL 动画,品牌蓝渐变标题 + 三句打字机标语,改文案直接编辑;本地预览用 Chrome headless 截图)+ 演示素材 `statusline.png` / `swarm.gif` + 生成器 `make_demo.py`(依赖 Pillow,由 statusline.py 真实渲染逐帧生成;展示变化后重新跑一遍即可) |
@@ -43,7 +43,7 @@ Kimi Code CLI(≥0.30.0)的底部状态栏插件。本体只有一个文件:`sta
 
 ## 四、关键机制
 
-- **增量缓存**:`refresh_cache()` 只扫当前会话 wire.jsonl(会话 token/金额)并拉官方额度;主流程发现缓存超过 `STALE_S`(20s)就 `Popen` 一个 detached `--refresh` 进程,自己用旧值先渲染 —— 状态栏永远 <50ms(预算 300ms)。
+- **增量缓存**:`refresh_cache()` 只扫当前会话 wire.jsonl(会话 token/金额)并拉官方额度;主流程发现缓存超过 `STALE_S`(20s)就 `Popen` 一个 detached `--refresh` 进程,自己用旧值先渲染 —— 状态栏永远 <50ms(预算 300ms)。缓存里会话条目按 sid 存**映射**(`sessions`,按最近活跃最多留 `MAX_CACHE_SESSIONS`=8 个)——单槽位时代多窗口会互相顶掉,token/金额/TPS 段周期性消失(v1.3.2 修复,别再退回单槽位)。
 - **官方额度缓存**:`fetch_official()` 挂在 refresh 进程里,成功才覆盖,失败保留上次;超过 `OFFICIAL_FRESH_S`(600s)未更新则回退校准值。
 - **swarm 动效**:`enter_ts` 来自最近一条 `swarm_mode.enter`,`elapsed < BURST_S`(8s)时整行走 `brand_flow()` 双波干涉水波;超时后只剩静态品牌蓝 `swarm` 段。重新进入会再次触发。
 - **动画帧率上限**:TUI `STATUS_LINE_RERUN_INTERVAL_MS=1000` 硬编码,任何动效都是 1fps。已提 issue:[MoonshotAI/kimi-code#2396](https://github.com/MoonshotAI/kimi-code/issues/2396)(请求做成可配)。若未来官方放开,把 `brand_flow` 的速度参数调小即可变丝滑。

@@ -31,14 +31,14 @@ def check(name, cond):
         FAILED.append(name)
 
 
-def render(cache_obj):
+def render(cache_obj, sid=''):
     """用指定缓存渲染一次状态栏,返回输出文本。"""
     fd, path = tempfile.mkstemp(suffix='.json')
     with os.fdopen(fd, 'w') as f:
         json.dump(cache_obj, f)
     old_cache, old_stdin = statusline.CACHE, sys.stdin
     statusline.CACHE = path
-    sys.stdin = io.StringIO(json.dumps({'sessionId': '', 'version': 'test'}))
+    sys.stdin = io.StringIO(json.dumps({'sessionId': sid, 'version': 'test'}))
     buf = io.StringIO()
     try:
         with redirect_stdout(buf):
@@ -133,7 +133,7 @@ statusline.CACHE = os.path.join(tmp_tps, 'cache.json')
 statusline.LOCK = os.path.join(tmp_tps, 'lock')
 try:
     statusline.refresh_cache(sid_t, 'test')
-    _sess = json.load(open(statusline.CACHE))['sess']
+    _sess = json.load(open(statusline.CACHE))['sessions'][sid_t]
 finally:
     statusline.fetch_official, statusline.CACHE, statusline.LOCK = _old_fetch, _old_cache, _old_lock
 
@@ -428,6 +428,62 @@ if _inst:
               rc == 0 and 'statusline.py' not in open(tui8, encoding='utf-8').read())
     finally:
         _uninst.subprocess.run, _uninst.shutil.which = saved_run2, saved_which2
+
+# ---- 多会话缓存互踩:单 sess 槽位被后刷新的会话覆盖,另一窗口的
+# token/金额/TPS 段随对端刷新消失(2026-08-16 双窗口真机复现) ----
+tmp_ms = tempfile.mkdtemp()
+statusline.SESSIONS = tmp_ms
+
+
+def make_sess_wire(sid, out_tokens, t1_ms):
+    d = os.path.join(tmp_ms, 'wd_m', sid, 'agents', 'main')
+    os.makedirs(d)
+    with open(os.path.join(d, 'wire.jsonl'), 'w') as f:
+        f.write(json.dumps({'type': 'usage.record',
+                            'usage': {'inputOther': 0, 'output': out_tokens,
+                                      'inputCacheRead': 0, 'inputCacheCreation': 0},
+                            'time': t1_ms}) + '\n')
+
+
+sid_a, sid_b = 'sess_multi_a', 'sess_multi_b'
+make_sess_wire(sid_a, 1000, now_ms - 1000)
+make_sess_wire(sid_b, 2000, now_ms)
+
+_old_fetch, _old_cache, _old_lock = (statusline.fetch_official,
+                                     statusline.CACHE, statusline.LOCK)
+statusline.fetch_official = lambda ver='': None
+statusline.CACHE = os.path.join(tmp_ms, 'cache.json')
+statusline.LOCK = os.path.join(tmp_ms, 'lock')
+try:
+    statusline.refresh_cache(sid_a, 'test')
+    statusline.refresh_cache(sid_b, 'test')  # B 后刷,不得挤掉 A 的条目
+    _cache = json.load(open(statusline.CACHE))
+    out_a = render(_cache, sid_a)
+    out_b = render(_cache, sid_b)
+    check('多会话:A 窗口在 B 刷新后仍显示自己的 token 段', '1.0K' in out_a)
+    check('多会话:B 窗口显示自己的 token 段', '2.0K' in out_b)
+
+    # 无 wire 的 sid 触发刷新:不得清空其他会话的条目
+    statusline.refresh_cache('sess_gone', 'test')
+    _cache2 = json.load(open(statusline.CACHE))
+    out_a2 = render(_cache2, sid_a)
+    check('多会话:无关会话刷新后 A 段不丢', '1.0K' in out_a2)
+
+    # 裁剪:条目按最近活跃(t1)保留至多 8 个,最老的丢弃
+    for i in range(9):
+        s = f'sess_prune_{i}'
+        make_sess_wire(s, 10 + i, now_ms - (9 - i) * 1000)
+        statusline.refresh_cache(s, 'test')
+    _sessions = json.load(open(statusline.CACHE)).get('sessions') or {}
+    check('会话映射存在且裁剪至 8 条', len(_sessions) == 8)
+    check('裁剪丢最老条目', 'sess_prune_0' not in _sessions and 'sess_prune_1' not in _sessions)
+finally:
+    statusline.fetch_official, statusline.CACHE, statusline.LOCK = _old_fetch, _old_cache, _old_lock
+
+# 旧版单槽位缓存:渲染端读兼容(迁移完成前老缓存仍能显示)
+out_legacy = render({'ts': now, 'sess': {'id': 'sess_old', 'tokens': 5000, 'cost': 1.0,
+                                         'out': 0, 't0': None, 't1': None}}, 'sess_old')
+check('旧版缓存 schema:渲染兼容单槽位', '5.0K' in out_legacy)
 
 print()
 if FAILED:
