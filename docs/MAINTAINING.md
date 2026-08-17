@@ -76,7 +76,7 @@ time (cat ~/.kimi-code/statusline-stdin.json | python3 statusline.py > /dev/null
 
 ## 七、CLI 更新后的兼容性巡检
 
-Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.36.1(2026-08-16 全部通过;patch 版本,变更几乎全是 web UI,无 status_line/wire/usages/plugin 相关条目;验证时本机快照仍为 0.36.0 会话所写,0.36.1 首个会话的字段/记录待其运行时自然确认,风险极低)。上一基线:CLI 0.36.0(2026-08-13 全部通过;`status-line-command.ts` / `managed-usage.ts` 与 0.35.0 逐字节相同,#2874 swarm 重构为纯目录搬迁、wire 记录 `swarm_mode.enter/exit` 与 payload 未变;新增实验性全屏 TUI(pi-tui rebaseline 未触碰 status/footer 文件)与 subagent 模型池,均不影响本插件,全屏模式待真机肉眼验证)。
+Kimi Code 升级后(尤其跨 minor 版本),按本清单逐项核对;全部通过则无需改动,有失败项按「三、数据通道」定位修复。最近基线:CLI 0.36.1(2026-08-16 全部通过;patch 版本,变更几乎全是 web UI,无 status_line/wire/usages/plugin 相关条目;0.36.1 会话快照字段当日真机已确认)。上一基线:CLI 0.36.0(2026-08-13 全部通过;`status-line-command.ts` / `managed-usage.ts` 与 0.35.0 逐字节相同,#2874 swarm 重构为纯目录搬迁、wire 记录 `swarm_mode.enter/exit` 与 payload 未变;新增实验性全屏 TUI(pi-tui rebaseline 未触碰 status/footer 文件)与 subagent 模型池,均不影响本插件,全屏模式待真机肉眼验证)。
 
 1. **官方 changelog 对照**:https://www.kimi.com/code/docs/en/kimi-code-cli/release-notes/changelog.html ,搜 status_line / plugin / wire / usages 相关条目。
 2. **stdin 快照字段**:`cat ~/.kimi-code/statusline-stdin.json` —— 应含 `model, cwd, gitBranch, permissionMode, planMode, contextUsage, contextTokens, maxContextTokens, sessionId, version`。
