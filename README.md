@@ -18,7 +18,7 @@
 
 ---
 
-Kimi Code CLI 状态栏增强：**额度、消耗、swarm 状态一眼看清**。额度数据与 `/usage` 完全同源（直连官方 `GET /coding/v1/usages` 接口）。
+Kimi Code CLI 状态栏增强插件（statusline plugin)：**额度、消耗、swarm 状态一眼看清**。额度数据与 `/usage` 完全同源（直连官方 `GET /coding/v1/usages` 接口）。
 
 ![状态栏效果](assets/statusline.png)
 
